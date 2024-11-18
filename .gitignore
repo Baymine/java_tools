@@ -36,3 +36,7 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### company
+/src/main/resources/
+/src/main/java/rsa/
