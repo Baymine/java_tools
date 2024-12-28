@@ -3,26 +3,22 @@ package config;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
-import rsa.conf.DatabaseConfig;
+import com.rsa.conf.DatabaseConfig;
 
 public class ConfigLoader {
     private Config config;
-    private static ConfigLoader instance;
 
 
-    public ConfigLoader() {
+    private ConfigLoader() {
         this.config = ConfigFactory.load();
     }
 
+    private static final class InstanceHolder {
+        static final ConfigLoader instance = new ConfigLoader();
+    }
+
     public static ConfigLoader getInstance() {
-        if (instance == null) {
-            synchronized (ConfigLoader.class) {
-                if (instance == null) {
-                    instance = new ConfigLoader();
-                }
-            }
-        }
-        return instance;
+        return InstanceHolder.instance;
     }
 
     public DatabaseConfig getLakehouseDBConfig(String sourceName) {
