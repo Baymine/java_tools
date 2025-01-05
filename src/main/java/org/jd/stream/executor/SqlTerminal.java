@@ -8,7 +8,9 @@ import org.jline.terminal.TerminalBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Connection;
@@ -186,9 +188,46 @@ public class SqlTerminal {
         logger.debug("Executing SQL: {}", sql);
         long startTime = System.currentTimeMillis();
         try {
-            SqlExecutor.executeMultiSql(connection, sql, false);
-            long endTime = System.currentTimeMillis();
-            logger.info("SQL executed in {} ms", endTime - startTime);
+            // Capture the output in a string builder
+            StringBuilder output = new StringBuilder();
+            PrintStream originalOut = System.out;
+            PrintStream originalErr = System.err;
+            
+            try {
+                // Redirect System.out to our string builder
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                PrintStream ps = new PrintStream(baos);
+                System.setOut(ps);
+                System.setErr(ps);
+                
+                // Execute the SQL command
+                SqlExecutor.executeMultiSql(connection, sql, false);
+                
+                // Get the output
+                ps.flush();
+                output.append(baos.toString());
+                
+                long endTime = System.currentTimeMillis();
+                output.append(String.format("%nQuery executed in %d ms%n", endTime - startTime));
+                
+            } finally {
+                // Restore original output streams
+                System.setOut(originalOut);
+                System.setErr(originalErr);
+            }
+            
+            // Display the output using pager if available
+            try {
+                if (PagerUtil.isPagerAvailable()) {
+                    PagerUtil.displayWithPager(output.toString());
+                } else {
+                    System.out.print(output);
+                }
+            } catch (IOException e) {
+                logger.error("Error displaying results with pager", e);
+                System.out.print(output);
+            }
+            
         } catch (Exception e) {
             logger.error("SQL Error: ", e);
             System.err.println("SQL Error: " + e.getMessage());
@@ -197,27 +236,54 @@ public class SqlTerminal {
 
     private void displayHelp() {
         logger.debug("Displaying help information");
-        System.out.println("Available commands:");
-        System.out.println("  exit                - Exit the SQL terminal");
-        System.out.println("  help                - Display this help message");
-        System.out.println("  history             - Show command history");
-        System.out.println("  clear               - Clear the screen");
-        System.out.println("\nSQL commands:");
-        System.out.println("  Enter your SQL commands ending with a semicolon (;)");
-        System.out.println("  Multi-line commands are supported");
-        System.out.println("\nKeyboard shortcuts:");
-        System.out.println("  Up/Down             - Navigate through command history");
-        System.out.println("  Left/Right          - Move cursor within line");
-        System.out.println("  Ctrl+Left/Right     - Move cursor by word");
-        System.out.println("  Home/End            - Move to start/end of line");
-        System.out.println("  Ctrl+C              - Cancel current input");
-        System.out.println("  Ctrl+D              - Exit the terminal");
+        StringBuilder help = new StringBuilder();
+        help.append("Available commands:\n");
+        help.append("  exit                - Exit the SQL terminal\n");
+        help.append("  help                - Display this help message\n");
+        help.append("  history             - Show command history\n");
+        help.append("  clear               - Clear the screen\n");
+        help.append("\nSQL commands:\n");
+        help.append("  Enter your SQL commands ending with a semicolon (;)\n");
+        help.append("  Multi-line commands are supported\n");
+        help.append("\nKeyboard shortcuts:\n");
+        help.append("  Up/Down             - Navigate through command history\n");
+        help.append("  Left/Right          - Move cursor within line\n");
+        help.append("  Ctrl+Left/Right     - Move cursor by word\n");
+        help.append("  Home/End            - Move to start/end of line\n");
+        help.append("  Ctrl+C              - Cancel current input\n");
+        help.append("  Ctrl+D              - Exit the terminal\n");
+        
+        try {
+            if (PagerUtil.isPagerAvailable()) {
+                PagerUtil.displayWithPager(help.toString());
+            } else {
+                System.out.print(help);
+            }
+        } catch (IOException e) {
+            logger.error("Error displaying help with pager", e);
+            System.out.print(help);
+        }
     }
 
     private void displayHistory() {
         logger.debug("Displaying command history");
+        StringBuilder content = new StringBuilder();
+        content.append("Command History:\n\n");
         for (History.Entry entry : history) {
-            System.out.printf("%5d  %s%n", entry.index() + 1, entry.line());
+            content.append(String.format("%5d  %s%n", entry.index() + 1, entry.line()));
+        }
+        
+        try {
+            if (PagerUtil.isPagerAvailable()) {
+                PagerUtil.displayWithPager(content.toString());
+            } else {
+                // Fallback to direct output if pager is not available
+                System.out.print(content);
+            }
+        } catch (IOException e) {
+            logger.error("Error displaying history with pager", e);
+            // Fallback to direct output
+            System.out.print(content);
         }
     }
 

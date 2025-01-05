@@ -160,34 +160,49 @@ public class SqlExecutor {
             data.add(row);
         }
 
+        // Build the output string
+        StringBuilder output = new StringBuilder();
+
         // Print header
-        printRowSeparator(columnWidths);
+        printRowSeparator(output, columnWidths);
         for (int i = 0; i < columnCount; i++) {
-            System.out.printf("| %-" + columnWidths.get(i) + "s ", columnNames.get(i));
+            output.append(String.format("| %-" + columnWidths.get(i) + "s ", columnNames.get(i)));
         }
-        System.out.println("|");
-        printRowSeparator(columnWidths);
+        output.append("|\n");
+        printRowSeparator(output, columnWidths);
 
         // Print data
         for (List<String> row : data) {
             for (int i = 0; i < columnCount; i++) {
-                System.out.printf("| %-" + columnWidths.get(i) + "s ", row.get(i));
+                output.append(String.format("| %-" + columnWidths.get(i) + "s ", row.get(i)));
             }
-            System.out.println("|");
+            output.append("|\n");
         }
-        printRowSeparator(columnWidths);
+        printRowSeparator(output, columnWidths);
 
-        System.out.println(data.size() + " row(s) in set");
+        output.append(data.size()).append(" row(s) in set\n");
+
+        // Display using pager if available
+        try {
+            if (PagerUtil.isPagerAvailable()) {
+                PagerUtil.displayWithPager(output.toString());
+            } else {
+                System.out.print(output);
+            }
+        } catch (IOException e) {
+            logger.error("Error displaying results with pager", e);
+            System.out.print(output);
+        }
     }
 
-    private static void printRowSeparator(List<Integer> columnWidths) {
+    private static void printRowSeparator(StringBuilder output, List<Integer> columnWidths) {
         for (int width : columnWidths) {
-            System.out.print("+-");
+            output.append("+-");
             for (int i = 0; i < width; i++) {
-                System.out.print("-");
+                output.append("-");
             }
-            System.out.print("-");
+            output.append("-");
         }
-        System.out.println("+");
+        output.append("+\n");
     }
 }
