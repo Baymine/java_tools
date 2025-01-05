@@ -1,152 +1,119 @@
-# Java Daily Tools(WIP)
+# Enhanced SQL Terminal
 
-![Java](https://img.shields.io/badge/Java-✓-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
-
-A collection of Java code snippets and tools designed to streamline daily development tasks. Whether you're automating routine processes, managing files, or handling data, this repository has tools to assist you.
-
-## Table of Contents
-
-- [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
+An interactive SQL terminal with advanced features including command history, line editing, and pager support.
 
 ## Features
 
-- **File Management:** Automate file creation, deletion, and organization.
-- **Data Processing:** Utilities for parsing, transforming, and analyzing data.
-- **Networking Tools:** Simplify network requests and responses handling.
-- **Automation Scripts:** Streamline repetitive tasks to save time.
-- **Custom Utilities:** Various tools tailored for daily development needs.
+- Command history with persistent storage
+- Line editing with Emacs-style shortcuts
+- Pager support for query results
+- Multi-line SQL command support
+- Customizable output formatting
+- Error handling and logging
+- Support for various SQL databases
 
 ## Prerequisites
 
-Before you begin, ensure you have met the following requirements:
+- Java 9 or higher
+- Maven 3.6 or higher
+- A supported SQL database (MySQL, PostgreSQL, etc.)
+- `less` command available in system path (for pager functionality)
 
-- **Java Development Kit (JDK):** Version 8 or higher.
-- **Maven:** For project build and dependency management.
-- **Git:** To clone the repository.
+## Building from Source
 
-## Installation
-
-1. **Clone the Repository**
-
+1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/java-daily-tools.git
+   git clone <repository-url>
+   cd java_tools
    ```
 
-2. **Navigate to the Project Directory**
-
+2. Build with Maven:
    ```bash
-   cd java-daily-tools
+   mvn clean package
    ```
 
-3. **Build the Project**
+## Running the Application
 
-   Using Maven:
+1. Ensure your database is running and accessible
 
+2. Run the application:
    ```bash
-   mvn clean install
+   java -jar target/java_tools-1.0-SNAPSHOT.jar
    ```
 
-   This will compile the code and run tests.
+## Terminal Commands
 
-## Usage
+### Basic Commands
+- `help` - Display help information
+- `exit` - Exit the terminal
+- `clear` - Clear the screen
+- `history` - Show command history
 
-Each tool in this repository is packaged as a standalone module. Below are general steps to use any of the tools:
+### Pager Commands
+- `pager less -S` - Set pager with horizontal scroll
+- `pager <command>` - Set custom pager command
+- `nopager` or `\n` - Disable pager
+- `\p` - Show current pager setting
 
-1. **Navigate to the Desired Tool's Directory**
+### SQL Commands
+- Enter SQL commands ending with semicolon (;)
+- Multi-line commands are supported
+- Results are automatically paged for large outputs
 
-   ```bash
-   cd tools/FileManager
-   ```
+### Keyboard Shortcuts
+- Up/Down - Navigate through command history
+- Left/Right - Move cursor within line
+- Ctrl+Left/Right - Move cursor by word
+- Home/End - Move to start/end of line
+- Ctrl+C - Cancel current input
+- Ctrl+D - Exit the terminal
+- Ctrl+R - Search command history
 
-2. **Run the Tool**
+## Configuration
 
-   ```bash
-   java -jar target/file-manager.jar
-   ```
+### Logging
+- Logs are stored in `logs/sql-terminal.log`
+- Log files are rotated daily
+- Last 7 days of logs are retained
+- Error messages are also shown in console
 
-   Replace `file-manager.jar` with the respective tool's jar file.
+### History
+- Command history is stored in `~/.sql_history`
+- History size is limited to 1000 entries
+- History is persisted between sessions
 
-### Example: File Manager
+## Troubleshooting
 
-Provides functionalities to create, delete, and organize files.
+### Common Issues
 
-```bash
-java -jar file-manager.jar --create /path/to/file.txt
-java -jar file-manager.jar --delete /path/to/file.txt
-java -jar file-manager.jar --organize /path/to/directory
-```
+1. Terminal not displaying properly:
+   - Ensure your terminal supports ANSI escape sequences
+   - Try running with `TERM=xterm-256color`
 
-## Project Structure
+2. Pager not working:
+   - Verify `less` is installed and in system PATH
+   - Try setting a different pager command
+   - Use `\p` to check current pager settings
 
-```
-java-daily-tools/
-├── tools/
-│   ├── FileManager/
-│   │   ├── src/
-│   │   ├── pom.xml
-│   │   └── README.md
-│   ├── DataProcessor/
-│   │   ├── src/
-│   │   ├── pom.xml
-│   │   └── README.md
-│   └── NetworkingTool/
-│       ├── src/
-│       ├── pom.xml
-│       └── README.md
-├── .gitignore
-├── README.md
-└── pom.xml
-```
+3. Database connection issues:
+   - Verify database is running and accessible
+   - Check connection parameters
+   - Review logs in `logs/sql-terminal.log`
 
-- **tools/**: Contains individual tool modules.
-- **.gitignore**: Specifies intentionally untracked files to ignore.
-- **pom.xml**: Maven configuration file.
-- **README.md**: Project documentation.
+### Debug Mode
+
+For more detailed logging, modify `src/main/resources/logback.xml`:
+- Set root level to "DEBUG" for more verbose logging
+- Add additional loggers for specific components
 
 ## Contributing
 
-Contributions are welcome! Follow these steps to contribute:
-
-1. **Fork the Repository**
-
-2. **Create a New Branch**
-
-   ```bash
-   git checkout -b feature/YourFeature
-   ```
-
-3. **Make Your Changes**
-
-4. **Commit Your Changes**
-
-   ```bash
-   git commit -m "Add some feature"
-   ```
-
-5. **Push to the Branch**
-
-   ```bash
-   git push origin feature/YourFeature
-   ```
-
-6. **Open a Pull Request**
-
-Please ensure your code adheres to the project's coding standards and includes necessary tests.
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
-
-## Contact
-
-If you have any questions or suggestions, feel free to contact me:
-- **Email:** kaihuacao04@gmail.com
-- **GitHub:** [@Baymine](https://github.com/Baymine)
+This project is licensed under the MIT License - see the LICENSE file for details.
