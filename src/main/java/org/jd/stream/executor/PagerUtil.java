@@ -31,7 +31,9 @@ public class PagerUtil {
         // Create process builder with command and arguments
         ProcessBuilder pb = new ProcessBuilder(cmdParts);
         
-        // Inherit error stream
+        // Inherit all streams for proper terminal handling
+        pb.redirectInput(ProcessBuilder.Redirect.PIPE);
+        pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
         pb.redirectError(ProcessBuilder.Redirect.INHERIT);
         
         Process process = null;
@@ -39,13 +41,16 @@ public class PagerUtil {
             process = pb.start();
             
             // Write content to pager
-            try (BufferedWriter writer = new BufferedWriter(
-                    new OutputStreamWriter(process.getOutputStream()))) {
+            try (OutputStream out = process.getOutputStream();
+                 BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out))) {
                 writer.write(content);
             }
             
             // Wait for pager to complete
-            process.waitFor();
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                logger.warn("Pager process exited with code: {}", exitCode);
+            }
             
         } catch (InterruptedException e) {
             logger.error("Pager process interrupted", e);
@@ -53,6 +58,15 @@ public class PagerUtil {
         } finally {
             if (process != null && process.isAlive()) {
                 process.destroy();
+                try {
+                    // Give it a chance to terminate gracefully
+                    if (!process.waitFor(1, TimeUnit.SECONDS)) {
+                        process.destroyForcibly();
+                    }
+                } catch (InterruptedException e) {
+                    process.destroyForcibly();
+                    Thread.currentThread().interrupt();
+                }
             }
         }
     }
@@ -72,7 +86,9 @@ public class PagerUtil {
             pb.command().add(opt);
         }
         
-        // Inherit error stream
+        // Inherit all streams for proper terminal handling
+        pb.redirectInput(ProcessBuilder.Redirect.PIPE);
+        pb.redirectOutput(ProcessBuilder.Redirect.INHERIT);
         pb.redirectError(ProcessBuilder.Redirect.INHERIT);
         
         Process process = null;
@@ -80,13 +96,16 @@ public class PagerUtil {
             process = pb.start();
             
             // Write content to less
-            try (BufferedWriter writer = new BufferedWriter(
-                    new OutputStreamWriter(process.getOutputStream()))) {
+            try (OutputStream out = process.getOutputStream();
+                 BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out))) {
                 writer.write(content);
             }
             
             // Wait for less to complete
-            process.waitFor();
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                logger.warn("Pager process exited with code: {}", exitCode);
+            }
             
         } catch (InterruptedException e) {
             logger.error("Pager process interrupted", e);
@@ -94,6 +113,15 @@ public class PagerUtil {
         } finally {
             if (process != null && process.isAlive()) {
                 process.destroy();
+                try {
+                    // Give it a chance to terminate gracefully
+                    if (!process.waitFor(1, TimeUnit.SECONDS)) {
+                        process.destroyForcibly();
+                    }
+                } catch (InterruptedException e) {
+                    process.destroyForcibly();
+                    Thread.currentThread().interrupt();
+                }
             }
         }
     }

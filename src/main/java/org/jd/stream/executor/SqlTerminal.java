@@ -109,31 +109,57 @@ public class SqlTerminal {
                 }
 
                 line = line.trim();
-                if (!line.isEmpty()) {
-                    if ("help".equalsIgnoreCase(line)) {
-                        displayHelp();
-                    } else {
-                        sqlBuffer.append(line);
-                        if (line.endsWith(";")) {
-                            String sql = sqlBuffer.toString().trim();
-                            processCommand(sql);
-                            sqlBuffer.setLength(0); // 清空缓冲区
-                        } else {
-                            sqlBuffer.append(" ");
-                        }
+                if (line.isEmpty()) {
+                    continue;
+                }
+
+                // Handle special commands first
+                if (line.startsWith("\\")) {
+                    String[] parts = line.split("\\s+", 2);
+                    handleSpecialCommand(parts[0]);
+                    if (parts.length > 1 && !parts[1].trim().isEmpty()) {
+                        // Process remaining part as SQL
+                        sqlBuffer.append(parts[1].trim());
                     }
-                } else if (sqlBuffer.length() > 0) {
-                    // 如果缓冲区不为空，则执行缓冲区中的SQL
-                    String sql = sqlBuffer.toString().trim();
-                    if (sql.endsWith(";")) {
-                        processCommand(sql);
-                        sqlBuffer.setLength(0); // 清空缓冲区
+                }
+                // Handle pager command
+                else if (line.toLowerCase().startsWith("pager")) {
+                    String[] parts = line.split("\\s+", 3);
+                    if (parts.length >= 2) {
+                        // Set pager command (parts[1] and optionally parts[2] for additional args)
+                        String pagerCmd = parts.length > 2 ? parts[1] + " " + parts[2] : parts[1];
+                        handlePagerCommand("pager " + pagerCmd);
+                    } else {
+                        handlePagerCommand(line);
+                    }
+                }
+                // Handle other commands
+                else {
+                    sqlBuffer.append(line);
+                    if (line.endsWith(";")) {
+                        String sql = sqlBuffer.toString().trim();
+                        if (sql.equalsIgnoreCase("help;")) {
+                            displayHelp();
+                        } else if (sql.equalsIgnoreCase("history;")) {
+                            displayHistory();
+                        } else if (sql.equalsIgnoreCase("clear;")) {
+                            lineReader.getTerminal().writer().print("\033[H\033[2J");
+                            lineReader.getTerminal().writer().flush();
+                        } else if (sql.equalsIgnoreCase("nopager;")) {
+                            currentPagerCommand = null;
+                            System.out.println("Pager disabled.");
+                        } else {
+                            processCommand(sql);
+                        }
+                        sqlBuffer.setLength(0);
+                    } else {
+                        sqlBuffer.append(" ");
                     }
                 }
             } catch (UserInterruptException e) {
                 // Ctrl+C
                 logger.debug("User interrupted input");
-                sqlBuffer.setLength(0); // 清空缓冲区
+                sqlBuffer.setLength(0);
             } catch (EndOfFileException e) {
                 // Ctrl+D
                 logger.info("End of file reached. Exiting SQL client.");
@@ -143,7 +169,7 @@ public class SqlTerminal {
             } catch (Exception e) {
                 logger.error("Error processing input: ", e);
                 System.err.println("Error: " + e.getMessage());
-                sqlBuffer.setLength(0); // 清空缓冲区
+                sqlBuffer.setLength(0);
             }
         }
     }
@@ -229,7 +255,9 @@ public class SqlTerminal {
     private void handlePagerCommand(String command) {
         String[] parts = command.split("\\s+", 2);
         if (parts.length > 1) {
-            currentPagerCommand = parts[1];
+            // Extract only the pager command part, not any SQL that might follow
+            String pagerCmd = parts[1].split(";")[0].trim();
+            currentPagerCommand = pagerCmd;
             System.out.println("Pager set to: " + currentPagerCommand);
         } else {
             currentPagerCommand = "less -S";  // Default pager command
