@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="RemoteTargetsManager">
+    <targets>
+      <target name="caokaihua1@10.203.46.164:443" type="ssh/sftp" uuid="da050961-3d96-4c9c-a900-7e7394b55e8c">
+        <config>
+          <option name="projectRootOnTarget" value="/data3/caokaihua1/jetbrain_temp/java_tools" />
+          <option name="serverName" value="caokaihua1@10.203.46.164:443 password" />
+          <option name="useRsync" value="true" />
+        </config>
+        <ContributedStateBase type="JavaLanguageRuntime">
+          <config>
+            <option name="javaVersionString" value="17.0.13" />
+          </config>
+        </ContributedStateBase>
+      </target>
+    </targets>
+  </component>
+</project>
