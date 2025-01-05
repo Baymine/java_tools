@@ -31,6 +31,7 @@ public class SqlTerminal {
     private final Thread inputThread;
     private static final String PROMPT = "sql> ";
     private static final String DEFAULT_HISTORY_FILE = ".sql_history";
+    private String currentPagerCommand = null;  // Store current pager command
 
     public SqlTerminal(Connection connection) throws IOException {
         this(connection, Paths.get(System.getProperty("user.home"), DEFAULT_HISTORY_FILE));
@@ -162,26 +163,78 @@ public class SqlTerminal {
 
     public void processCommand(String command) {
         logger.debug("Processing command: {}", command);
-        commandBuffer.add(command); // For testing
-
-        if ("help".equalsIgnoreCase(command.trim())) {
-            displayHelp();
+        command = command.trim();
+        
+        // Handle empty commands
+        if (command.isEmpty()) {
             return;
         }
 
-        if ("history".equalsIgnoreCase(command.trim())) {
-            displayHistory();
+        // Add to command buffer for testing
+        commandBuffer.add(command);
+
+        // Handle special commands
+        if (command.startsWith("\\")) {
+            handleSpecialCommand(command);
             return;
         }
 
-        if ("clear".equalsIgnoreCase(command.trim())) {
-            lineReader.getTerminal().writer().print("\033[H\033[2J");
-            lineReader.getTerminal().writer().flush();
+        // Handle pager command
+        if (command.toLowerCase().startsWith("pager")) {
+            handlePagerCommand(command);
             return;
         }
 
-        // Execute the SQL command
+        // Handle built-in commands
+        switch (command.toLowerCase()) {
+            case "help":
+                displayHelp();
+                return;
+            case "history":
+                displayHistory();
+                return;
+            case "clear":
+                lineReader.getTerminal().writer().print("\033[H\033[2J");
+                lineReader.getTerminal().writer().flush();
+                return;
+            case "nopager":
+                currentPagerCommand = null;
+                System.out.println("Pager disabled.");
+                return;
+        }
+
+        // Execute SQL command
         executeSql(command);
+    }
+
+    private void handleSpecialCommand(String command) {
+        switch (command.toLowerCase()) {
+            case "\\n":
+                currentPagerCommand = null;
+                System.out.println("Pager disabled.");
+                break;
+            case "\\p":
+                if (currentPagerCommand != null) {
+                    System.out.println("Current pager: " + currentPagerCommand);
+                } else {
+                    System.out.println("No pager set.");
+                }
+                break;
+            default:
+                System.out.println("Unknown command: " + command);
+                break;
+        }
+    }
+
+    private void handlePagerCommand(String command) {
+        String[] parts = command.split("\\s+", 2);
+        if (parts.length > 1) {
+            currentPagerCommand = parts[1];
+            System.out.println("Pager set to: " + currentPagerCommand);
+        } else {
+            currentPagerCommand = "less -S";  // Default pager command
+            System.out.println("Pager set to default: less -S");
+        }
     }
 
     private void executeSql(String sql) {
@@ -216,9 +269,11 @@ public class SqlTerminal {
                 System.setErr(originalErr);
             }
             
-            // Display the output using pager if available
+            // Display the output using current pager if set
             try {
-                if (PagerUtil.isPagerAvailable()) {
+                if (currentPagerCommand != null) {
+                    PagerUtil.displayWithCustomPager(output.toString(), currentPagerCommand);
+                } else if (PagerUtil.isPagerAvailable()) {
                     PagerUtil.displayWithPager(output.toString());
                 } else {
                     System.out.print(output);
@@ -242,6 +297,10 @@ public class SqlTerminal {
         help.append("  help                - Display this help message\n");
         help.append("  history             - Show command history\n");
         help.append("  clear               - Clear the screen\n");
+        help.append("  pager [command]     - Set output pager (default: less -S)\n");
+        help.append("  nopager             - Disable pager\n");
+        help.append("  \\n                  - Disable pager (alternative)\n");
+        help.append("  \\p                  - Show current pager setting\n");
         help.append("\nSQL commands:\n");
         help.append("  Enter your SQL commands ending with a semicolon (;)\n");
         help.append("  Multi-line commands are supported\n");
@@ -254,7 +313,9 @@ public class SqlTerminal {
         help.append("  Ctrl+D              - Exit the terminal\n");
         
         try {
-            if (PagerUtil.isPagerAvailable()) {
+            if (currentPagerCommand != null) {
+                PagerUtil.displayWithCustomPager(help.toString(), currentPagerCommand);
+            } else if (PagerUtil.isPagerAvailable()) {
                 PagerUtil.displayWithPager(help.toString());
             } else {
                 System.out.print(help);
