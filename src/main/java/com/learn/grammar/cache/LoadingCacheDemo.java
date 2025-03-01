@@ -35,6 +35,9 @@ public class LoadingCacheDemo {
             Set<Integer> keys = new HashSet<>(Arrays.asList(10, 100, 1000));
             // Use getAll to retrieve multiple values at once
             Map<Integer, Integer> squares = squareCache.getAll(keys); // Loads value for key 5
+            squareCache.getIfPresent(keys.iterator().next());
+            squareCache.invalidate(keys.iterator().next());
+
             System.out.println("Squares: " + squares);
 
             // Access the load count via AtomicReference

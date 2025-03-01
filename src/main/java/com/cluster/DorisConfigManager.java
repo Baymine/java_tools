@@ -2,337 +2,345 @@ package com.cluster;
 
 import com.rsa.conf.DatabaseConfig;
 import config.ConfigLoader;
+import lombok.Getter;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.*;
 import java.util.*;
+import java.util.logging.Logger;
 
 public class DorisConfigManager {
-    static private String refClusterName = "";
-    static private String targetClusterName = "";
-
+    private static final Logger LOGGER = Logger.getLogger(DorisConfigManager.class.getName());
     private static final ConfigLoader configLoader = ConfigLoader.getInstance();
     public static final DatabaseConfig dbConfig = configLoader.getLakehouseDBConfig("local");
 
-    static class DorisCluster {
-        String name;
-        String jdbcUrl;
-        String user;
-        String password;
+    // Builder Pattern for DorisCluster
+    @Getter
+    public static class DorisCluster {
+        private final String name;
+        private final String jdbcUrl;
+        private final String user;
+        private final String password;
 
-
-        public DorisCluster(String name, String jdbcUrl, String user, String password) {
-            this.name = name;
-            this.jdbcUrl = jdbcUrl;
-            this.user = user;
-            this.password = password;
+        private DorisCluster(Builder builder) {
+            this.name = builder.name;
+            this.jdbcUrl = builder.jdbcUrl;
+            this.user = builder.user;
+            this.password = builder.password;
         }
+
+        public static class Builder {
+            private String name;
+            private String jdbcUrl;
+            private String user;
+            private String password;
+
+            public Builder name(String name) {
+                this.name = name;
+                return this;
+            }
+
+            public Builder jdbcUrl(String jdbcUrl) {
+                this.jdbcUrl = jdbcUrl;
+                return this;
+            }
+
+            public Builder user(String user) {
+                this.user = user;
+                return this;
+            }
+
+            public Builder password(String password) {
+                this.password = password;
+                return this;
+            }
+
+            public DorisCluster build() {
+                return new DorisCluster(this);
+            }
+        }
+
     }
 
-    static class ConfigFetcher {
-        private DorisCluster cluster;
+    // Interface segregation principle
+    interface ConfigOperation {
+        Map<String, String> fetchConfig(DorisCluster cluster) throws SQLException;
+    }
 
+    interface ConfigAlignment {
+        void align(DorisCluster cluster, Map<String, String> referenceConfig) throws SQLException;
+    }
 
-        public ConfigFetcher(DorisCluster cluster) {
-            this.cluster = cluster;
+    // Strategy Pattern for different config operations
+    public static class VariableConfigOperation implements ConfigOperation {
+        @Override
+        public Map<String, String> fetchConfig(DorisCluster cluster) throws SQLException {
+            return getStringStringMap(cluster.getJdbcUrl(), cluster.getUser(), cluster.getPassword(), cluster);
         }
 
-        public Map<String, String> fetchShowVariables() {
+        public static Map<String, String> getStringStringMap(String jdbcUrl, String user, String password, DorisCluster cluster) throws SQLException {
             Map<String, String> variables = new HashMap<>();
             String query = "SHOW VARIABLES";
 
-            try (Connection conn = DriverManager.getConnection(cluster.jdbcUrl, cluster.user, cluster.password);
-                 Statement statement = conn.createStatement();
-                 ResultSet resultSet = statement.executeQuery(query)
-            ){
-                while (resultSet.next()) {
-                    String variableName = resultSet.getString("Variable_name");
-                    String value = resultSet.getString("Value");
-                    variables.put(variableName, value);
+            try (Connection conn = DriverManager.getConnection(
+                    jdbcUrl, user, password);
+                 Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(query)) {
+                while (rs.next()) {
+                    variables.put(rs.getString("Variable_name"), rs.getString("Value"));
                 }
-                return variables;
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
             }
+            return variables;
         }
+    }
 
-        public Map<String, String> fetchFrontendConfig() throws SQLException {
-            Map<String, String> frontendConfig = new HashMap<>();
+    static class FrontendConfigOperation implements ConfigOperation {
+        @Override
+        public Map<String, String> fetchConfig(DorisCluster cluster) throws SQLException {
+            Map<String, String> config = new HashMap<>();
             String query = "ADMIN SHOW FRONTEND CONFIG";
 
             try (Connection conn = DriverManager.getConnection(
-                    cluster.jdbcUrl, cluster.user, cluster.password);
-                 Statement stmt = conn.createStatement()) {
-
-                boolean hasResultSet = stmt.execute(query);
-                if (hasResultSet) {
-                    try (ResultSet rs = stmt.getResultSet()) {
-                        // Adjust column names based on actual output
-                        // Common column names might be "Key" and "Value" or similar
-                        // You should verify the actual column names returned by Doris
-                        while (rs.next()) {
-                            String key = rs.getString("Key");
-                            String value = rs.getString("Value");
-                            if (key != null && value != null) {
-                                frontendConfig.put(key, value);
-                            }
-                        }
-                    }
-                } else {
-                    // Handle cases where the command doesn't return a ResultSet
-                    System.err.println("ADMIN SHOW FRONTEND CONFIG did not return a ResultSet.");
+                    cluster.getJdbcUrl(), cluster.getUser(), cluster.getPassword());
+                 Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(query)) {
+                while (rs.next()) {
+                    config.put(rs.getString("Key"), rs.getString("Value"));
                 }
             }
-
-            return frontendConfig;
-        }
-
-        static class ConfigComparer {
-            private static void compareConfigs(Map<String, String> reference, Map<String, String> target) {
-                HashSet<String> allKeys = new HashSet<>();
-                allKeys.addAll(reference.keySet());
-                allKeys.addAll(target.keySet());
-
-                System.out.println("Differences: ");
-                for(String key : allKeys) {
-                    String refVal = reference.get(key);
-                    String targetVal = target.get(key);
-
-                    if(!Objects.equals(refVal, targetVal)) {
-                        System.out.printf("Variable: %s%n %s: %s%n  %s: %s%n%n", key, refClusterName, refVal, targetClusterName,targetVal);
-                    }
-                }
-            }
-        }
-
-        // Aligns target cluster's configurations to match the reference cluster
-        // TODO: before perform the alignment, save the config into a file
-        static class ConfigAligner {
-            private DorisCluster targetCluster;
-
-            ConfigAligner(DorisCluster targetCluster) {
-                this.targetCluster = targetCluster;
-            }
-
-            public void alignConfigs(Map<String, String> referenceConfigs) throws SQLException {
-                try (Connection conn = DriverManager.getConnection(
-                        targetCluster.jdbcUrl, targetCluster.user, targetCluster.password);
-                     Statement stmt = conn.createStatement()) {
-
-                    for (Map.Entry<String, String> entry : referenceConfigs.entrySet()) {
-                        String variable = entry.getKey();
-                        String value = entry.getValue();
-                        String setQuery = String.format("SET GLOBAL %s = '%s';", variable, value);
-
-                        try {
-                            stmt.execute(setQuery);
-                            System.out.printf("Set %s to %s on cluster %s%n",
-                                    variable, value, targetCluster.name);
-                        } catch (SQLException e) {
-                            System.err.printf("Failed to set %s on cluster %s: %s%n",
-                                    variable, targetCluster.name, e.getMessage());
-                        }
-                    }
-                }
-            }
-
-            // TODO: before perform the alignment, save the config into a file
-            public void alignFrontendConfigs(Map<String, String> referenceFrontendConfigs) throws SQLException {
-                // Assuming there's a way to set frontend configs via SQL commands
-                // This might need to be adjusted based on Doris's actual capabilities
-                try (Connection conn = DriverManager.getConnection(
-                        targetCluster.jdbcUrl, targetCluster.user, targetCluster.password);
-                     Statement stmt = conn.createStatement()) {
-
-                    for (Map.Entry<String, String> entry : referenceFrontendConfigs.entrySet()) {
-                        String key = entry.getKey();
-                        String value = entry.getValue();
-                        String setQuery = String.format("SET FRONTEND CONFIG %s = '%s';", key, value);
-
-                        try {
-                            stmt.execute(setQuery);
-                            System.out.printf("Set frontend config %s to %s on cluster %s%n",
-                                    key, value, targetCluster.name);
-                        } catch (SQLException e) {
-                            System.err.printf("Failed to set frontend config %s on cluster %s: %s%n",
-                                    key, targetCluster.name, e.getMessage());
-                        }
-                    }
-                }
-            }
-
-            public void rollbackConfig(DorisCluster cluster) {
-                // TODO: rollback the config
-                return ;
-            }
+            return config;
         }
     }
 
-    public static void saveBatchDiff(DorisCluster refCluster, List<DorisCluster> targetClusters, String filePath) throws SQLException {
-        // Fetch configurations from the reference cluster
-        ConfigFetcher refFetcher = new ConfigFetcher(refCluster);
-        Map<String, String> refVariables = refFetcher.fetchShowVariables();
-        Map<String, String> refFrontendConfigs = refFetcher.fetchFrontendConfig();
+    // Command Pattern for configuration actions
+    interface ConfigCommand {
+        void execute() throws SQLException;
+    }
 
-        // Merge reference configurations
-        Map<String, String> refConfigs = new HashMap<>();
-        refConfigs.putAll(refVariables);
-        refConfigs.putAll(refFrontendConfigs);
+    static class AlignConfigCommand implements ConfigCommand {
+        private final DorisCluster targetCluster;
+        private final Map<String, String> referenceConfig;
+        private final ConfigAlignment alignment;
 
-        // Initialize CSV data with headers: Config Key, Config Type, Reference Cluster, Target1, Target2, ...
-        List<String> headers = new ArrayList<>();
-        headers.add("Config Key");
-        headers.add("Config Type"); // Added config type column
-        headers.add(refCluster.name);
-        for (DorisCluster target : targetClusters) {
-            headers.add(target.name);
+        AlignConfigCommand(DorisCluster targetCluster, Map<String, String> referenceConfig, ConfigAlignment alignment) {
+            this.targetCluster = targetCluster;
+            this.referenceConfig = referenceConfig;
+            this.alignment = alignment;
         }
+
+        @Override
+        public void execute() throws SQLException {
+            alignment.align(targetCluster, referenceConfig);
+        }
+    }
+
+    // Observer Pattern for logging
+    interface ConfigurationObserver {
+        void onConfigurationChange(String message);
+    }
+
+    static class ConsoleLogger implements ConfigurationObserver {
+        @Override
+        public void onConfigurationChange(String message) {
+            LOGGER.info(message);
+        }
+    }
+
+    // Factory Pattern for config operations
+    static class ConfigOperationFactory {
+        public static ConfigOperation createOperation(String type) {
+            return switch (type.toLowerCase()) {
+                case "variable" -> new VariableConfigOperation();
+                case "frontend" -> new FrontendConfigOperation();
+                default -> throw new IllegalArgumentException("Unknown config operation type: " + type);
+            };
+        }
+    }
+
+    // Main configuration manager implementation
+    private final List<ConfigurationObserver> observers = new ArrayList<>();
+    private final DorisCluster referenceCluster;
+    private final List<DorisCluster> targetClusters;
+
+    public DorisConfigManager(DorisCluster referenceCluster, List<DorisCluster> targetClusters) {
+        this.referenceCluster = referenceCluster;
+        this.targetClusters = new ArrayList<>(targetClusters);
+        this.observers.add(new ConsoleLogger());
+    }
+
+    public void addObserver(ConfigurationObserver observer) {
+        observers.add(observer);
+    }
+
+    private void notifyObservers(String message) {
+        observers.forEach(observer -> observer.onConfigurationChange(message));
+    }
+
+    public void compareAndAlignConfigurations() throws SQLException {
+        Map<String, String> referenceVariables = ConfigOperationFactory.createOperation("variable")
+                .fetchConfig(referenceCluster);
+        Map<String, String> referenceFrontendConfigs = ConfigOperationFactory.createOperation("frontend")
+                .fetchConfig(referenceCluster);
+
+        for (DorisCluster targetCluster : targetClusters) {
+            notifyObservers("Processing cluster: " + targetCluster.getName());
+            
+            // Compare and align variables
+            new AlignConfigCommand(targetCluster, referenceVariables, 
+                (cluster, config) -> printAlignmentCommands(cluster, config, "GLOBAL"))
+                .execute();
+
+            // Compare and align frontend configs
+            new AlignConfigCommand(targetCluster, referenceFrontendConfigs,
+                (cluster, config) -> printAlignmentCommands(cluster, config, "FRONTEND CONFIG"))
+                .execute();
+        }
+    }
+
+    private void printAlignmentCommands(DorisCluster cluster, Map<String, String> referenceConfig, String configType) 
+            throws SQLException {
+        Map<String, String> currentConfig = configType.equals("GLOBAL") ?
+                ConfigOperationFactory.createOperation("variable").fetchConfig(cluster) :
+                ConfigOperationFactory.createOperation("frontend").fetchConfig(cluster);
+
+        System.out.println("\n=== SET " + configType + " Commands for cluster " + cluster.getName() + " ===");
+        
+        // Print set commands
+        referenceConfig.forEach((key, value) -> {
+            String currentValue = currentConfig.get(key);
+            if (!Objects.equals(value, currentValue)) {
+                String setQuery = String.format("SET %s %s = '%s';", configType, key, value);
+                System.out.println(setQuery);
+            }
+        });
+
+        // Print rollback commands
+        System.out.println("\n=== Rollback Commands for " + configType + " ===");
+        currentConfig.forEach((key, value) -> {
+            if (referenceConfig.containsKey(key)) {
+                String rollbackQuery = String.format("SET %s %s = '%s';", configType, key, value);
+                System.out.println(rollbackQuery);
+            }
+        });
+    }
+
+    public void saveDifferencesToCsv(String filePath) throws SQLException, IOException {
+        Map<String, String> referenceVariables = ConfigOperationFactory.createOperation("variable")
+                .fetchConfig(referenceCluster);
+        Map<String, String> referenceFrontendConfigs = ConfigOperationFactory.createOperation("frontend")
+                .fetchConfig(referenceCluster);
 
         List<String[]> csvData = new ArrayList<>();
+        
+        // Add headers
+        List<String> headers = new ArrayList<>();
+        headers.add("Config Key");
+        headers.add("Config Type");
+        headers.add(referenceCluster.getName());
+        targetClusters.forEach(cluster -> headers.add(cluster.getName()));
         csvData.add(headers.toArray(new String[0]));
 
-        // Gather all configuration keys from reference and target clusters
-        Set<String> allConfigKeys = new HashSet<>(refConfigs.keySet());
-        Map<DorisCluster, Map<String, String>> targetConfigsMap = new HashMap<>();
+        // Process variables and frontend configs
+        processConfigDifferences(referenceVariables, "Variable", csvData);
+        processConfigDifferences(referenceFrontendConfigs, "Frontend", csvData);
 
-        for (DorisCluster target : targetClusters) {
-            ConfigFetcher targetFetcher = new ConfigFetcher(target);
-            Map<String, String> targetVariables = targetFetcher.fetchShowVariables();
-            Map<String, String> targetFrontendConfigs = targetFetcher.fetchFrontendConfig();
-            Map<String, String> targetConfigs = new HashMap<>();
-            targetConfigs.putAll(targetVariables);
-            targetConfigs.putAll(targetFrontendConfigs);
-            targetConfigsMap.put(target, targetConfigs);
-            allConfigKeys.addAll(targetConfigs.keySet());
-        }
+        // Write to CSV
+        writeCsvFile(filePath, csvData);
+    }
 
-        // Populate CSV data with configuration comparisons
-        for (String configKey : allConfigKeys) {
-            String refValue = refConfigs.getOrDefault(configKey, "N/A");
-            boolean hasDifference = false;
+    private void processConfigDifferences(Map<String, String> referenceConfig, String configType, List<String[]> csvData) 
+            throws SQLException {
+        for (Map.Entry<String, String> entry : referenceConfig.entrySet()) {
+            String key = entry.getKey();
+            String refValue = entry.getValue();
             
-            // Check if there are any differences with target clusters
-            for (DorisCluster target : targetClusters) {
-                Map<String, String> targetConfigs = targetConfigsMap.get(target);
-                String targetValue = targetConfigs.getOrDefault(configKey, "N/A");
-                if (!refValue.equals(targetValue)) {
+            List<String> row = new ArrayList<>();
+            row.add(key);
+            row.add(configType);
+            row.add(refValue);
+
+            boolean hasDifference = false;
+            for (DorisCluster targetCluster : targetClusters) {
+                Map<String, String> targetConfig = ConfigOperationFactory
+                    .createOperation(configType.toLowerCase())
+                    .fetchConfig(targetCluster);
+                String targetValue = targetConfig.getOrDefault(key, "N/A");
+                row.add(targetValue);
+                
+                if (!Objects.equals(refValue, targetValue)) {
                     hasDifference = true;
-                    break;
                 }
             }
 
-            // Only add to CSV if there are differences
             if (hasDifference) {
-                List<String> row = new ArrayList<>();
-                row.add(configKey);
-                // Determine config type
-                String configType = refVariables.containsKey(configKey) ? "Variable" : "Frontend";
-                row.add(configType);
-                row.add(refValue);
-
-                for (DorisCluster target : targetClusters) {
-                    Map<String, String> targetConfigs = targetConfigsMap.get(target);
-                    String targetValue = targetConfigs.getOrDefault(configKey, "N/A");
-                    row.add(targetValue);
-                }
-
                 csvData.add(row.toArray(new String[0]));
             }
         }
+    }
 
-        // Write the CSV data to the specified file
+    private void writeCsvFile(String filePath, List<String[]> csvData) throws IOException {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
             for (String[] line : csvData) {
-                // Escape double quotes and encapsulate fields containing special characters
-                StringBuilder csvLineBuilder = new StringBuilder();
-                for (int i = 0; i < line.length; i++) {
-                    String field = line[i];
-                    if (field.contains(",") || field.contains("\"") || field.contains("\n")) {
-                        field = field.replace("\"", "\"\"");
-                        field = "\"" + field + "\"";
-                    }
-                    csvLineBuilder.append(field);
-                    if (i < line.length - 1) {
-                        csvLineBuilder.append(",");
-                    }
-                }
-                String csvLine = csvLineBuilder.toString();
-                writer.write(csvLine);
+                writer.write(String.join(",", Arrays.stream(line)
+                    .map(this::escapeCsvField)
+                    .toArray(String[]::new)));
                 writer.newLine();
             }
-            System.out.println("Configuration differences saved to " + filePath);
-        } catch (IOException e) {
-            System.err.println("Failed to write CSV file: " + e.getMessage());
+            notifyObservers("Configuration differences saved to " + filePath);
         }
     }
 
-    public static void main(String[] args) throws Exception{
-        refClusterName = "drpub1820";
-//        List<String> targetClusterNameList =  Arrays.asList("drpub806", "drpub807", "drpub809", "drpub820", "drpub1001","drpub900", "drpub901", "drpub902","drpub920","drpub906", "drpub907","drpub950", "drpub1050", "drpub1150","drpub915", "drpub916", "drpub917","drpub952", "drpub1052", "drpub1152");
-        List<String> targetClusterNameList =  Arrays.asList("drpub1101");
-
-        Boolean needAlignment = false;
-        Boolean needRollback = false;
-
-        // Define your clusters
-        DorisCluster referenceCluster = new DorisCluster(
-                refClusterName,
-                "jdbc:mysql://" + refClusterName + ".olap.jd.com:2000",
-                dbConfig.getUsername(),
-                dbConfig.getPassword()
-        );
-        List<DorisCluster> targetClusters = new ArrayList<>();
-
-        for (String targetClusterName : targetClusterNameList){
-            targetClusters.add(new DorisCluster(targetClusterName, "jdbc:mysql://" + targetClusterName +".olap.jd.com:2000", "root", dbConfig.getPassword()));
+    private String escapeCsvField(String field) {
+        if (field.contains(",") || field.contains("\"") || field.contains("\n")) {
+            return "\"" + field.replace("\"", "\"\"") + "\"";
         }
+        return field;
+    }
 
-        System.out.println("Starting saving the diff");
-        saveBatchDiff(referenceCluster, targetClusters, "~/Testing/diff.csv");
-        System.out.println("Finished saving the diff");
+    public static void main(String[] args) {
+        try {
+            String refClusterName = "drpub808";
+            List<String> targetClusterNames = Arrays.asList(
+                "drpub949"
+            );
+//            List<String> targetClusterNames = Arrays.asList(
+//                    "drpub807","drpub808","drpub810","drpub805","drpub806","drpub820","drpub952","drpub1052","drpub1152"
+//                    ,"drpub1101","drpub1102","drpub1103","drpub1001","drpub950","drpub1050","drpub1150","drpub900","drpub901"
+//                    ,"drpub902","drpub903","drpub906","drpub907","drpub940","drpub941","drpub942","drpub943","drpub944","drpub945"
+//            );
 
-        System.out.println("reference: " + referenceCluster.name + "//target: " + targetClusters.get(0).name);
-        // Fetch configurations from reference cluster
-        ConfigFetcher referenceFetcher = new ConfigFetcher(referenceCluster);
-        Map<String, String> referenceVariables = new HashMap<>();
-        Map<String, String> referenceFrontendConfigs = new HashMap<>();
+            // Create reference cluster using Builder pattern
+            DorisCluster referenceCluster = new DorisCluster.Builder()
+                .name(refClusterName)
+                .jdbcUrl("jdbc:mysql://" + refClusterName + ".olap.jd.com:2000")
+                .user(dbConfig.getUsername())
+                .password(dbConfig.getPassword())
+                .build();
 
-        System.out.println("Fetching configurations from reference cluster...");
-        referenceVariables = referenceFetcher.fetchShowVariables();
-        referenceFrontendConfigs = referenceFetcher.fetchFrontendConfig();
+            // Create target clusters
+            List<DorisCluster> targetClusters = targetClusterNames.stream()
+                .map(name -> new DorisCluster.Builder()
+                    .name(name)
+                    .jdbcUrl("jdbc:mysql://" + name + ".olap.jd.com:2000")
+                    .user("root")
+                    .password(dbConfig.getPassword())
+                    .build())
+                .toList();
 
-        // Iterate over target clusters
-        for (DorisCluster target : targetClusters) {
-            System.out.printf("%nProcessing target cluster: %s%n", target.name);
-            ConfigFetcher targetFetcher = new ConfigFetcher(target);
-            Map<String, String> targetVariables = new HashMap<>();
-            Map<String, String> targetFrontendConfigs = new HashMap<>();
+            // Initialize config manager
+            DorisConfigManager manager = new DorisConfigManager(referenceCluster, targetClusters);
 
-            // Fetch target configurations
-            targetVariables = targetFetcher.fetchShowVariables();
-            targetFrontendConfigs = targetFetcher.fetchFrontendConfig();
+            // Save differences to CSV
+            manager.saveDifferencesToCsv("/data3/caokaihua1/Testing/diff_test.csv");
 
-            // Compare configurations
-            System.out.println("Comparing SHOW VARIABLES...");
-            ConfigFetcher.ConfigComparer.compareConfigs(referenceVariables, targetVariables);
+            // Compare and align configurations
+//            manager.compareAndAlignConfigurations();
 
-            System.out.println("Comparing FRONTEND CONFIG...");
-            ConfigFetcher.ConfigComparer.compareConfigs(referenceFrontendConfigs, targetFrontendConfigs);
-
-            if (needAlignment){
-                // Align configurations
-                ConfigFetcher.ConfigAligner aligner = new ConfigFetcher.ConfigAligner(target);
-                System.out.println("Aligning SHOW VARIABLES...");
-                aligner.alignConfigs(referenceVariables);
-
-                System.out.println("Aligning FRONTEND CONFIG...");
-                aligner.alignFrontendConfigs(referenceFrontendConfigs);
-            }
-
+        } catch (Exception e) {
+            LOGGER.severe("Error in main: " + e.getMessage());
+            e.printStackTrace();
         }
-
-        System.out.println("\nConfiguration comparison and alignment complete.");
     }
 }

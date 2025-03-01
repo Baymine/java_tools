@@ -1,5 +1,6 @@
 package config;
 
+import com.rsa.conf.IamConfig;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigException;
 import com.typesafe.config.ConfigFactory;
@@ -34,6 +35,22 @@ public class ConfigLoader {
             return new DatabaseConfig(username, password, cipherKey, hadoopUserName, hadoopUserToken);
         } catch (ConfigException.Missing e) {
             throw new IllegalArgumentException("Configuration for group '" + sourceName + "' not found.", e);
+        }
+    }
+
+    public IamConfig getIamConfig() {
+        try {
+            Config iamConfig = config.getConfig("iam");
+
+            String IAMEndpoint = iamConfig.getString("IAMEndpoint");
+            String defaultSource = iamConfig.getString("defaultSource");
+            String IAMToken = iamConfig.getString("IAMToken");
+            String erp = iamConfig.getString("erp");
+            String hadoopUserName = iamConfig.getString("hadoopUserName");
+
+            return new IamConfig(IAMEndpoint, defaultSource, IAMToken, erp, hadoopUserName);
+        } catch (ConfigException.Missing e) {
+            throw new IllegalArgumentException("Configuration for IAM not found.", e);
         }
     }
 }

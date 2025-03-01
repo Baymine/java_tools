@@ -13,23 +13,27 @@ import java.util.concurrent.TimeUnit;
 public class PagerUtil {
     private static final Logger logger = LoggerFactory.getLogger(PagerUtil.class);
     private static final String LESS_CMD = "less";
-    private static final String[] LESS_OPTS = {"-S", "-R", "-F", "-X"};
+    private static final String[] LESS_OPTS = {"-S", "-F", "-X"};
+    private static final String COLOR_OPT = "-R";
 
     /**
-     * Displays the given content using a custom pager command.
+     * Displays the given content using the system's 'less' command.
      *
      * @param content The content to display
-     * @param pagerCommand The pager command to use (e.g., "less -S", "more")
+     * @param withColor Whether to enable color support
      * @throws IOException if an I/O error occurs
      */
-    public static void displayWithCustomPager(String content, String pagerCommand) throws IOException {
-        logger.debug("Displaying content with custom pager: {}", pagerCommand);
+    public static void displayWithPager(String content, boolean withColor) throws IOException {
+        logger.debug("Displaying content with default pager (colors: {})", withColor);
         
-        // Split the pager command into command and arguments
-        String[] cmdParts = pagerCommand.trim().split("\\s+");
-        
-        // Create process builder with command and arguments
-        ProcessBuilder pb = new ProcessBuilder(cmdParts);
+        // Create less process
+        ProcessBuilder pb = new ProcessBuilder(LESS_CMD);
+        for (String opt : LESS_OPTS) {
+            pb.command().add(opt);
+        }
+        if (withColor) {
+            pb.command().add(COLOR_OPT);
+        }
         
         // Inherit all streams for proper terminal handling
         pb.redirectInput(ProcessBuilder.Redirect.PIPE);
@@ -40,13 +44,13 @@ public class PagerUtil {
         try {
             process = pb.start();
             
-            // Write content to pager
+            // Write content to less
             try (OutputStream out = process.getOutputStream();
                  BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out))) {
                 writer.write(content);
             }
             
-            // Wait for pager to complete
+            // Wait for less to complete
             int exitCode = process.waitFor();
             if (exitCode != 0) {
                 logger.warn("Pager process exited with code: {}", exitCode);
@@ -78,12 +82,28 @@ public class PagerUtil {
      * @throws IOException if an I/O error occurs
      */
     public static void displayWithPager(String content) throws IOException {
-        logger.debug("Displaying content with default pager");
+        displayWithPager(content, false);
+    }
+
+    /**
+     * Displays the given content using a custom pager command.
+     *
+     * @param content The content to display
+     * @param pagerCommand The pager command to use (e.g., "less -S", "more")
+     * @throws IOException if an I/O error occurs
+     */
+    public static void displayWithCustomPager(String content, String pagerCommand) throws IOException {
+        logger.debug("Displaying content with custom pager: {}", pagerCommand);
         
-        // Create less process
-        ProcessBuilder pb = new ProcessBuilder(LESS_CMD);
-        for (String opt : LESS_OPTS) {
-            pb.command().add(opt);
+        // Split the pager command into command and arguments
+        String[] cmdParts = pagerCommand.trim().split("\\s+");
+        
+        // Create process builder with command and arguments
+        ProcessBuilder pb = new ProcessBuilder(cmdParts);
+        
+        // Add color support if using less
+        if (cmdParts[0].endsWith("less") && !pagerCommand.contains("-R")) {
+            pb.command().add(COLOR_OPT);
         }
         
         // Inherit all streams for proper terminal handling
@@ -95,13 +115,13 @@ public class PagerUtil {
         try {
             process = pb.start();
             
-            // Write content to less
+            // Write content to pager
             try (OutputStream out = process.getOutputStream();
                  BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(out))) {
                 writer.write(content);
             }
             
-            // Wait for less to complete
+            // Wait for pager to complete
             int exitCode = process.waitFor();
             if (exitCode != 0) {
                 logger.warn("Pager process exited with code: {}", exitCode);

@@ -16,9 +16,9 @@
 - [x] Add cut/paste functionality
 
 ### Phase 3: Terminal Output and Display
-- [ ] Implement pager support using 'less -S' for query results
-- [ ] Add proper output formatting with line wrapping
-- [ ] Support for horizontal scrolling in wide results
+- [x] Implement pager support using 'less -S' for query results
+- [x] Add proper output formatting with line wrapping
+- [x] Support for horizontal scrolling in wide results
 - [ ] Add color highlighting for different data types
 - [ ] Implement progress indicators for long-running queries
 
@@ -108,18 +108,34 @@
   - Fixed premature exit issues
   - Added detailed logging for debugging
 
-### Next Steps
-1. Implement pager support for query results
-   - Add integration with system 'less' command
-   - Configure 'less' with proper options (-S for horizontal scroll)
-   - Handle terminal size for proper display
-   - Implement proper cleanup after pager exit
+### 2024-03-21
+- Implemented pager support and output formatting
+  - Added PagerUtil class for pager functionality
+  - Implemented custom pager command support
+  - Added proper stream handling for pager processes
+  - Fixed command parsing for pager commands
+  - Added horizontal scrolling support
+- Added logging configuration
+  - Configured file-based logging with rotation
+  - Added proper log levels and formatting
+  - Created logs directory structure
+- Updated documentation
+  - Created comprehensive README
+  - Added troubleshooting guide
+  - Updated progress tracking
 
-2. Create dedicated terminal window
-   - Research best approach for spawning new terminal
-   - Handle terminal process lifecycle
-   - Implement proper communication between main app and terminal
-   - Add window management features
+### Next Steps
+1. Implement color highlighting for different data types:
+   - Add ANSI color support for SQL types
+   - Highlight numbers, strings, nulls, and dates
+   - Add color configuration options
+   - Ensure colors work with pager
+
+2. Add progress indicators for long-running queries:
+   - Implement spinner or progress bar
+   - Show elapsed time
+   - Add estimated rows processed
+   - Support query cancellation
 
 ## Implementation Notes
 - Using JLine library for terminal interaction

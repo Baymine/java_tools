@@ -140,11 +140,13 @@ public class SqlExecutor {
         // Get column names and maximum widths
         List<String> columnNames = new ArrayList<>();
         List<Integer> columnWidths = new ArrayList<>();
+        List<Integer> columnTypes = new ArrayList<>();
 
         for (int i = 1; i <= columnCount; i++) {
             String columnName = metaData.getColumnLabel(i);
             columnNames.add(columnName);
             columnWidths.add(columnName.length());
+            columnTypes.add(metaData.getColumnType(i));
         }
 
         // Get data and update column widths
@@ -166,7 +168,8 @@ public class SqlExecutor {
         // Print header
         printRowSeparator(output, columnWidths);
         for (int i = 0; i < columnCount; i++) {
-            output.append(String.format("| %-" + columnWidths.get(i) + "s ", columnNames.get(i)));
+            output.append(String.format("| %-" + columnWidths.get(i) + "s ", 
+                SqlFormatter.formatHeader(columnNames.get(i))));
         }
         output.append("|\n");
         printRowSeparator(output, columnWidths);
@@ -174,7 +177,8 @@ public class SqlExecutor {
         // Print data
         for (List<String> row : data) {
             for (int i = 0; i < columnCount; i++) {
-                output.append(String.format("| %-" + columnWidths.get(i) + "s ", row.get(i)));
+                String formattedValue = SqlFormatter.formatValue(row.get(i), columnTypes.get(i));
+                output.append(String.format("| %-" + columnWidths.get(i) + "s ", formattedValue));
             }
             output.append("|\n");
         }
@@ -185,7 +189,8 @@ public class SqlExecutor {
         // Display using pager if available
         try {
             if (PagerUtil.isPagerAvailable()) {
-                PagerUtil.displayWithPager(output.toString());
+                // Add -R flag to less for color support
+                PagerUtil.displayWithPager(output.toString(), true);
             } else {
                 System.out.print(output);
             }

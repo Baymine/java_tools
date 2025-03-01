@@ -14,6 +14,19 @@
           </config>
         </ContributedStateBase>
       </target>
+      <target name="caokaihua1@10.203.24.118:443" type="ssh/sftp" uuid="0acf47f4-ea23-4c57-bb1c-e5dc309f92f0">
+        <config>
+          <option name="projectRootOnTarget" value="/home/caokaihua1/java_tools" />
+          <option name="serverName" value="caokaihua1@10.203.24.118:443 agent" />
+          <option name="useRsync" value="true" />
+        </config>
+        <ContributedStateBase type="JavaLanguageRuntime">
+          <config>
+            <option name="homePath" value="/usr/lib/jvm/jdk-17.0.6" />
+            <option name="javaVersionString" value="17.0.6" />
+          </config>
+        </ContributedStateBase>
+      </target>
     </targets>
   </component>
 </project>

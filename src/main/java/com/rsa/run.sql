@@ -1,0 +1,632 @@
+-- 中心子句有问题
+-- WITH
+--     current_day AS (
+--         SELECT
+--             sd_num
+--         FROM
+--             dmc_qm.dmcqm_qmemp_cash_daily_mntr_biz_i_d
+--         WHERE
+--             label IN ('现金贷')
+--           AND dt = '2024-12-12'
+--     ),
+--     preivous_day AS (
+--         SELECT
+--             sd_num
+--         FROM
+--             dmc_qm.dmcqm_qmemp_cash_daily_mntr_biz_i_d
+--         WHERE
+--             label IN ('现金贷')
+--           AND dt = date_sub_str ('2024-12-12', 1)
+--     )
+-- SELECT
+--     ROUND(((current_day) / (preivous_day) - 1) * 100, 2) AS "环比"
+-- FROM current_day, previous_day;
+
+-- 获取元数据非常慢：生成查询计划需要2分钟+
+-- set nereids_timeout_second=180; set enable_sql_cache=true;set enable_external_file_cache=true;
+-- explain WITH
+--     cmdb AS
+--         (
+--             SELECT DISTINCT
+--                 ip,
+--                 server_code,
+--                 cluster_name,
+--                 nn_one
+--             FROM
+--                 (
+--                     SELECT
+--                         ip,
+--                         infos['server_code'] server_code,
+--                         infos['phy_cluster_code'] AS cluster_name,
+--                         group_name AS nn
+--                     FROM
+--                         gdm.gdm_m99_cmdb_node_info_da
+--                             CROSS JOIN unnest(cluster_server_info) ast(infos)
+--                     WHERE
+--                         dt = '2025-01-04'
+--                       AND infos['server_code'] IN('nn', 'onn', 'router')
+--                       AND infos['phy_cluster_code'] IN
+--                           (
+--                               SELECT
+--                                   cluster
+--                               FROM
+--                                   dim.dim_jdr_plat_platdat_hdfs_audit_cluster
+--                               WHERE
+--                                   online_flag = '1'
+--                           )
+--                 )
+--                     a
+--                     CROSS JOIN unnest(SPLIT(nn, ',')) ast(nn_one)
+--             WHERE
+--                 nn_one LIKE 'ns%'
+--         )
+--         ,
+--     hdfs AS
+--         (
+--             SELECT DISTINCT
+--                 CASE
+--                     WHEN cluster IN('tyrande', 'guldan')
+--                         THEN 'hope'
+--                     WHEN cluster = 'evil'
+--                         THEN '10k'
+--                     ELSE cluster
+--                     END AS cluster,
+--                 nn,
+--                 nnip,
+--                 infotype
+--             FROM
+--                 app.app_jdr_plat_platdata_hdfs_audit_log_mointor_v2
+--             WHERE
+--                 CONCAT(dt, hour) IN
+--                 (
+--                     SELECT
+--                         CONCAT(dt, hour) AS dh
+--                     FROM
+--                         app.app_jdr_plat_platdata_hdfs_audit_log_mointor_v2
+--                     GROUP BY
+--                         CONCAT(dt, hour)
+--                     ORDER BY
+--                         CONCAT(dt, hour) DESC limit 24
+--     )
+--     )
+-- SELECT
+--     COUNT(1)
+-- FROM
+--     (
+--         SELECT
+--             hdfs.*
+--         FROM
+--             hdfs
+--                 LEFT JOIN cmdb
+--                           ON
+--                               hdfs.nnip = cmdb.ip
+--                                   AND hdfs.cluster = cmdb.cluster_name
+--                                   AND hdfs.nn = cmdb.nn_one
+--                                   AND hdfs.infotype = cmdb.server_code
+--         WHERE
+--             cmdb.ip IS NULL
+--     )
+--         finl
+-- WHERE
+--     infotype = 'nn'
+--   AND nn NOT IN('ns10', 'ns1010', 'ns17')
+
+
+
+-- use dmr_c;
+-- select
+--     (case when wrong_cnt>500 then 1 else 0 end) as flag
+-- from
+--     (  select  sum(coalesce(wrong_cnt,0)) as wrong_cnt
+--        from dmr_c.dmr_jdt_dmrc_te_chongfu_monitor_i_sum_d
+--        where dt = '2024-12-29'
+--     ) as a
+
+-- explain SELECT DISTINCT
+--     ip,
+--     server_code,
+--     cluster_name,
+--     nn_one
+-- FROM (
+--          SELECT
+--              ip,
+--              infos['server_code'] AS server_code,
+--              infos['phy_cluster_code'] AS cluster_name,
+--              group_name AS nn
+--          FROM gdm.gdm_m99_cmdb_node_info_da AS gdm_m99_cmdb_node_info_da LATERAL VIEW EXPLODE(cluster_server_info) ast as infos
+--          WHERE
+--              dt /* dt = sysdate( - 2) */ = '2025-01-05'
+--            AND infos['server_code'] IN ('nn', 'onn', 'router')
+--            AND infos['phy_cluster_code'] IN (
+--              (
+--              SELECT
+--              `cluster`
+--              FROM dim.dim_jdr_plat_platdat_hdfs_audit_cluster AS dim_jdr_plat_platdat_hdfs_audit_cluster
+--              WHERE
+--              online_flag = '1'
+--              )
+--              )
+--      ) AS a LATERAL VIEW EXPLODE(SPLIT_BY_STRING(nn, ',')) ast as nn_one
+-- WHERE
+--     nn_one LIKE 'ns%'
+
+-- hive 表存在key命名的列会报错
+-- select "key" from app.app_sfs_c03_fdc_timeseries where "key" = 'salesForecast' limit 1;
+
+-- 952 查询返回空
+-- select
+--     *
+-- from
+--     app.app_jdh_m14_m_online_log_ext_i_det_d
+-- where dt >= sysdate(-10)
+--   and dt <= sysdate(-1)
+--   and page_id = 'JDH_MInteliService_TriageHome'
+--   and coalesce(hospital_source,'') <> ''
+--   and coalesce(env ,'') <> ''
+--   and coalesce(hospital_source,'') = 'SUYU'
+
+-- 950集群查询很慢
+-- SELECT
+--     CAST(COUNT(CASE WHEN item_third_cate_cd IS NULL THEN 1 END) AS DOUBLE) / CAST(COUNT(1) AS DOUBLE) AS null_rate
+-- FROM app.app_unification_data_sku_info_da AS app_unification_data_sku_info_da
+-- WHERE
+--     dt = '2025-01-07';
+--
+-- SELECT
+--     a1.mem_id,
+--     a1.join_grp_time,
+--     a1.grp_name,
+--     a1.lv_grp_time,
+--     a1.join_grp_mode_code,
+--     a1.grp_create_time,
+--     a1.mem_type_code,
+--     a1.grp_id
+-- FROM
+--     (
+--         SELECT
+--             b.mem_id,
+--             b.join_grp_time,
+--             b.join_grp_mode_code,
+--             b.lv_grp_time,
+--             a.grp_name,
+--             a.grp_create_time,
+--             b.mem_type_code,
+--             a.grp_id
+--         FROM
+--             idm.idm_c01_fin_telp_corp_wechat_grp_a_d a
+--                 JOIN idm.idm_c01_fin_telp_corp_wechat_grp_mem_a_d b
+--                      ON
+--                          a.grp_id = b.grp_id
+--         WHERE
+--             a.corp_id = 'ww922ca38e45598347'
+--     )
+--         a1
+--         LEFT JOIN
+--     (
+--         SELECT
+--             c.acct_no,
+--             c.extn_cust_wechat_id
+--         FROM
+--             idm.idm_c01_fin_telp_wechat_cust_agent_rel_s_d c
+--         WHERE
+--             dt = sysdate(-1)
+--     )
+--         a2
+--     ON
+--         a1.mem_id = a2.extn_cust_wechat_id
+-- WHERE
+--     a2.acct_no = 'jd_CcSsfmCVGlJd'
+-- GROUP BY
+--     a1.mem_id,
+--     a1.join_grp_time,
+--     a1.grp_name,
+--     a1.lv_grp_time,
+--     a1.join_grp_mode_code,
+--     a1.grp_create_time,
+--     a1.mem_type_code,
+--     a1.grp_id
+
+-- explain select dt from app.app_jdr_yhzz_ord_base_i_d_d where dt = '2025-01-08' limit 10;
+
+-- explain WITH
+--     cmdb AS
+--         (
+--             SELECT DISTINCT
+--                 ip,
+--                 server_code,
+--                 cluster_name,
+--                 nn_one
+--             FROM
+--                 (
+--                     SELECT
+--                         ip,
+--                         infos['server_code'] server_code,
+--                         infos['phy_cluster_code'] AS cluster_name,
+--                         group_name AS nn
+--                     FROM
+--                         gdm.gdm_m99_cmdb_node_info_da
+--                             CROSS JOIN unnest(cluster_server_info) ast(infos)
+--                     WHERE
+--                         dt = '2025-01-04'
+--                       AND infos['server_code'] IN('nn', 'onn', 'router')
+--                       AND infos['phy_cluster_code'] IN
+--                           (
+--                               SELECT
+--                                   cluster
+--                               FROM
+--                                   dim.dim_jdr_plat_platdat_hdfs_audit_cluster
+--                               WHERE
+--                                   online_flag = '1'
+--                           )
+--                 )
+--                     a
+--                     CROSS JOIN unnest(SPLIT(nn, ',')) ast(nn_one)
+--             WHERE
+--                 nn_one LIKE 'ns%'
+--         )
+--         ,
+--     hdfs AS
+--         (
+--             SELECT DISTINCT
+--                 CASE
+--                     WHEN cluster IN('tyrande', 'guldan')
+--                         THEN 'hope'
+--                     WHEN cluster = 'evil'
+--                         THEN '10k'
+--                     ELSE cluster
+--                     END AS cluster,
+--                 nn,
+--                 nnip,
+--                 infotype
+--             FROM
+--                 app.app_jdr_plat_platdata_hdfs_audit_log_mointor_v2
+--             WHERE
+--                 CONCAT(dt, hour) IN
+--                 (
+--                     SELECT
+--                         CONCAT(dt, hour) AS dh
+--                     FROM
+--                         app.app_jdr_plat_platdata_hdfs_audit_log_mointor_v2
+--                     GROUP BY
+--                         CONCAT(dt, hour)
+--                     ORDER BY
+--                         CONCAT(dt, hour) DESC limit 24
+--     )
+--     )
+-- SELECT
+--     COUNT(1)
+-- FROM
+--     hdfs
+-- WHERE
+--     infotype = 'nn'
+--   AND nn NOT IN('ns10', 'ns1010', 'ns17')
+
+
+-- SELECT cast(COUNT(CASE WHEN jdh0034023 is null then 1 ELSE null END) as double)/ (COUNT(*) * 1.0) * 100 as ratio FROM app.app_jdh_label_search_business_user_wide_portrait_s_sum_d WHERE dt='2025-01-12'
+
+-- select  * from dev.test_sales;
+
+-- SELECT COUNT(demand_code) AS resultCount, AVG(dateDiff) AS dateDiff, round(AVG(card_test_waiting_time) / 86400000, 2) AS card_test_waiting_time FROM ( SELECT demand_code,demand_expected_release_date,card_release_real_date,card_test_waiting_time, CASE WHEN demand_expected_release_date IS NOT NULL AND demand_expected_release_date != '' AND card_release_real_date IS NOT NULL AND card_release_real_date != '' THEN DATEDIFF(card_release_real_date,demand_expected_release_date) ELSE 0 END AS dateDiff FROM dmc_ll.dmcll_ft_dev_card_detail_df_00008987_a_d WHERE card_space_key IN('pay_sdk1024','XJQD','QYQD','FTDevService','jd_zf') AND card_test_time LIKE '%2024-02-09%' GROUP BY demand_code,demand_expected_release_date,card_release_real_date,card_test_waiting_time ) LIMIT 5000
+
+-- select count(distinct category_id1)
+-- from jrdw_fdm.fdm_sight_message_monitor_result
+-- where 880 = 880
+--   and dt = date('2025-01-23 16:59:00')
+--   and cluster = 'verify'
+--   and tenant_id = 100003
+--   and create_time between '2025-01-23 16:59:00' and '2025-01-23 17:25:00'
+--   and model_id = 38
+--   and length(category_id1) > 0;
+
+-- select * from app.`app_sdl_yinliu_search_query_log` where  dt='2025-01-23' limit 10
+-- refresh table app.app_jdr_wsm_fk_flowlog_abnormal_behavior_i_s_hour;select count(1)
+-- from app.app_jdr_wsm_fk_flowlog_abnormal_behavior_i_s_hour
+-- where dt='2025-02-05'
+--   and ht='14'
+--   and rule='10101'
+-- limit 1000;
+
+-- select t."t1_dim_date" as "t1_dim_date", t."t1_rds_id" as "t1_rds_id", t."t1_src_url" as "t1_src_url", t."t1_arouse_cnt" as "t1_arouse_cnt", t."t1_yw_high_val" as "t1_yw_high_val" , t."t1_yw_middle_val" as "t1_yw_middle_val", t."t1_yw_low_val" as "t1_yw_low_val", t."t1_fyw_high_val" as "t1_fyw_high_val", t."t1_fyw_middle_val" as "t1_fyw_middle_val", t."t1_fyw_low_val" as "t1_fyw_low_val" , t."t1_risk_cnt" as "t1_risk_cnt", t."t1_if_watch" as "t1_if_watch", t."t1_final_price_after_risk" as "t1_final_price_after_risk", t."t1_total_val" as "t1_total_val", t."t1_roi" as "t1_roi" , t."t1_final_price_after_risk_beishu" as "t1_final_price_after_risk_beishu" from ( select t1."dim_date" as t1_dim_date, t1."rds_id" as t1_rds_id, t1."src_url" as t1_src_url, t1."arouse_cnt" as t1_arouse_cnt, t1."yw_high_val" as t1_yw_high_val , t1."yw_middle_val" as t1_yw_middle_val, t1."yw_low_val" as t1_yw_low_val, t1."fyw_high_val" as t1_fyw_high_val, t1."fyw_middle_val" as t1_fyw_middle_val, t1."fyw_low_val" as t1_fyw_low_val , t1."final_price" as t1_final_price, t1."risk_cnt" as t1_risk_cnt, t1."final_price_after_risk" as t1_final_price_after_risk, t1."if_watch" as t1_if_watch, t1."total_val" as t1_total_val , t1."roi" as t1_roi, t1."final_price_after_risk_beishu" as t1_final_price_after_risk_beishu, t1."roi_beishu" as t1_roi_beishu, t1."dt" as t1_dt from dmc_oa.dmcoa_report_qrqj_new_stl_i_d t1 ) t where 1 = 1 and (1 = 1 and (1 = 1 and format_datetime(cast(date_supplement(cast(t."t1_dim_date" as varchar)) as timestamp), 'yyyy-MM-dd') >= '2025-01-12' and format_datetime(cast(date_supplement(cast(t."t1_dim_date" as varchar)) as timestamp), 'yyyy-MM-dd') <= '2025-01-12')) and (1 = 1 and cast(t."t1_rds_id" as varchar) in ('2446')) limit 10000;
+--
+-- set disable_nereids_rules='';
+-- set sql_dialect='doris';select * from (select * from (select * from hive.dev.test_sales order by id)) a;
+
+-- set enable_sql_cache=false;SELECT fee_detail_id,sett_id,apply_id,invoice_id,collect_invoice_id,compaccountid,accountsn,bankaccountid,pay_id,dt FROM dmf_rpt.dmf_jdt_dmfrpt_fi_hs_f06_cwsj_aea_fee_sett_zj_fss_mapping_s_det_d WHERE dt = '2025-02-11' AND compaccountid = '704085841831184385' LIMIT 0, 100
+-- set enable_sql_cache=false;select * from dmf_rpt.dmf_jdt_dmfrpt_fi_hs_f06_cwsj_aea_fee_sett_zj_fss_mapping_s_det_d
+-- where sett_id = '1638788039593541640' and dt = '2025-02-10'
+
+-- 逻辑执行计划生成失败
+-- SELECT
+--     *,
+--     entry,
+--     sceneName,
+--     intentName,
+--     subIntentName,
+--     subIntentId,
+--     merchantType,
+--     subIntentConsultCount,
+--     '京灵在线' AS channelType,
+--     ROW_NUMBER() OVER(PARTITION BY entry ORDER BY subIntentConsultCount DESC) AS subIntentConsultRank,
+--         DENSE_RANK() OVER(ORDER BY entry) AS groupLabel
+-- FROM
+--     (
+--         SELECT
+--             'all' AS entry,
+--             nlu.hierarchical1_scene_name AS sceneName,
+--             nlu.hierarchical2_cate_name AS intentName,
+--             nlu.hierarchical3_sub_intent_name AS subIntentName,
+--             nlu.hierarchical3_sub_intent_id AS subIntentId,
+--             gw.merchant_type AS merchantType,
+--             COUNT(nlu.hierarchical3_sub_intent_name) AS subIntentConsultCount
+--         FROM
+--             (
+--                 SELECT
+--                     entry,
+--                     bot_id,
+--                     message_id,
+--                     session_id,
+--                     CASE
+--                         WHEN regexp_like(entry, '^vc|^VC')
+--                             THEN '自营商家'
+--                         ELSE 'POP商家'
+--                         END AS merchant_type,
+--                     send_time
+--                 FROM
+--                     app.app_zy_jimi3_jimi30_jdjimi3gw_base_info
+--                 WHERE
+--                     dt >= sysdate(-1)
+--                   AND bot_id = 42757
+--                   AND entry != ''
+--             )
+--                 gw
+--                 INNER JOIN
+--             (
+--                 SELECT
+--                     hierarchical1_scene_name,
+--                     hierarchical2_cate_name,
+--                     hierarchical3_sub_intent_name,
+--                     hierarchical3_sub_intent_id,
+--                     message_id,
+--                     session_id
+--                 FROM
+--                     app.app_zy_jimi3_jimi30_jdjimi3nlu_intent_recognize
+--                 WHERE
+--                     dt >= sysdate(-1)
+--                   AND hierarchical1_scene_name != ''
+-- 					AND hierarchical2_cate_name != ''
+-- 					AND hierarchical3_sub_intent_name != ''
+-- 					AND hierarchical3_sub_intent_id != ''
+--             )
+--                 nlu
+--             ON
+--                 gw.session_id = nlu.session_id
+--                     AND gw.message_id = nlu.message_id
+--         GROUP BY
+--             nlu.hierarchical1_scene_name,
+--             nlu.hierarchical2_cate_name,
+--             nlu.hierarchical3_sub_intent_name,
+--             nlu.hierarchical3_sub_intent_id,
+--             gw.merchant_type
+--
+--         UNION ALL
+--
+--         SELECT
+--             gw.entry,
+--             nlu.hierarchical1_scene_name AS sceneName,
+--             nlu.hierarchical2_cate_name AS intentName,
+--             nlu.hierarchical3_sub_intent_name AS subIntentName,
+--             nlu.hierarchical3_sub_intent_id AS subIntentId,
+--             gw.merchant_type AS merchantType,
+--             COUNT(nlu.hierarchical3_sub_intent_name) AS subIntentConsultCount
+--         FROM
+--             (
+--                 SELECT
+--                     entry,
+--                     bot_id,
+--                     message_id,
+--                     session_id,
+--                     CASE
+--                         WHEN regexp_like(entry, '^vc|^VC')
+--                             THEN '自营商家'
+--                         ELSE 'POP商家'
+--                         END AS merchant_type,
+--                     send_time
+--                 FROM
+--                     app.app_zy_jimi3_jimi30_jdjimi3gw_base_info
+--                 WHERE
+--                     dt >= sysdate(-1)
+--                   AND bot_id = 42757
+--                   AND entry != ''
+--             )
+--                 gw
+--                 INNER JOIN
+--             (
+--                 SELECT
+--                     hierarchical1_scene_name,
+--                     hierarchical2_cate_name,
+--                     hierarchical3_sub_intent_name,
+--                     hierarchical3_sub_intent_id,
+--                     message_id,
+--                     session_id
+--                 FROM
+--                     app.app_zy_jimi3_jimi30_jdjimi3nlu_intent_recognize
+--                 WHERE
+--                     dt >= sysdate(-1)
+--                   AND hierarchical1_scene_name != ''
+-- 					AND hierarchical2_cate_name != ''
+-- 					AND hierarchical3_sub_intent_name != ''
+-- 					AND hierarchical3_sub_intent_id != ''
+--             )
+--                 nlu
+--             ON
+--                 gw.session_id = nlu.session_id
+--                     AND gw.message_id = nlu.message_id
+--         GROUP BY
+--             gw.entry,
+--             nlu.hierarchical1_scene_name,
+--             nlu.hierarchical2_cate_name,
+--             nlu.hierarchical3_sub_intent_name,
+--             nlu.hierarchical3_sub_intent_id,
+--             gw.merchant_type
+--     )
+--         res
+-- GROUP BY
+--     entry,
+--     sceneName,
+--     intentName,
+--     subIntentName,
+--     subIntentId,
+--     merchantType,
+--     subIntentConsultCount
+
+-- select *
+-- from (
+--     select * from dev.test_sales
+--      ) t
+-- group by
+--     item
+
+
+-- select regexp_like('123@gmail.com', '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$')
+
+-- SELECT regexp_replace(content, ' ', '，') as content FROM ( SELECT regexp_replace(content, ' ', '，') as content FROM jrdw_fdm.fdm_zy_jimi3_jimi30_jdjimi3gw_base_info_copy WHERE regexp_like(content, '优惠') AND dt >= CONCAT( '0-', format_datetime( from_unixtime( CAST( SUBSTR( 1739083334649, 1, 10) AS DOUBLE)), 'yyyy-MM-dd' ) ) AND dt <= CONCAT( '0-', format_datetime( from_unixtime( CAST( SUBSTR( 1739342536649, 1, 10) AS DOUBLE)), 'yyyy-MM-dd' ) ) AND send_time >= format_datetime( from_unixtime( CAST( SUBSTR( 1739083334649, 1, 10) AS DOUBLE)), 'yyyy-MM-dd HH:mm:ss.mmm' ) AND send_time <= format_datetime( from_unixtime( CAST( SUBSTR( 1739342536649, 1, 10) AS DOUBLE)), 'yyyy-MM-dd HH:mm:ss.mmm' ) AND bot_id = 1 AND content != '' AND message_id NOT IN ( SELECT up_id FROM jrdw_fdm.fdm_jimi3_answer_strategy_copy WHERE dt >= CONCAT( '0-', format_datetime( from_unixtime( CAST( SUBSTR( 1739083334649, 1, 10) AS DOUBLE)), 'yyyy-MM-dd' ) ) AND dt <= CONCAT( '0-', format_datetime( from_unixtime( CAST( SUBSTR( 1739342536649, 1, 10) AS DOUBLE)), 'yyyy-MM-dd' ) ) AND send_time >= format_datetime( from_unixtime( CAST( SUBSTR( 1739083334649, 1, 10) AS DOUBLE)), 'yyyy-MM-dd HH:mm:ss.mmm' ) AND send_time <= format_datetime( from_unixtime( CAST( SUBSTR( 1739342536649, 1, 10) AS DOUBLE)), 'yyyy-MM-dd HH:mm:ss.mmm' ) AND strategy_code = 'emergencyDefenceActionNode' AND bot_id = 1 AND json_extract_scalar(trigger_reason, '$.faqRepositoryId') = '159379' ) GROUP BY content ) ORDER BY content OFFSET 0 limit 1000
+
+-- whitelist error
+-- SELECT sum(if(dp IN ('wide', 'arrive_order') AND (ad_plan_id IS NULL OR ad_plan_id = ''), 1, 0)) AS ad_plan_id_isnull_num, sum(if(dp IN ('wide', 'arrive_order') AND (ad_group_id IS NULL OR ad_group_id = ''), 1, 0)) AS ad_group_id_isnull_num, sum(if(dp IN ('wide', 'arrive_order') AND (material_id IS NULL OR material_id = ''), 1, 0)) AS material_id_isnull_num FROM app.app_jdr_ad_business_model_flow_center_external_fusion_wide_i_s_d WHERE dt = '2025-02-16' AND dp IN ('wide', 'arrive_order')
+
+-- SELECT SUM(if(campaign_type IN (95), 0, impressions)) AS impressions, SUM(if(campaign_type IN (95), 0, clicks)) AS clicks, SUM(if(campaign_type IN (94, 99, 100, 95), 0, cost)) / 1000000 AS consumption FROM ads_report.dws_effects_hour WHERE dt = '2025-02-16' AND delivery_system_type IN (0, 6, 12) AND business_type IN (256, 2048) AND data_type = 0
+
+-- 查询时间很长
+-- select * from dmr_jud.dmrjud_jud_01_risk_ordr_i_d where ( parent_sale_ord_id='307227121162' and sale_ord_dt >='2024-02-01' and sale_ord_dt <='2025-01-31' or parent_sale_ord_id='306136265544' and sale_ord_dt >='2024-02-01' and sale_ord_dt <='2025-01-31' or parent_sale_ord_id='297180568074' and sale_ord_dt >='2024-02-01' and sale_ord_dt <='2025-01-31' or parent_sale_ord_id='289282900207' and sale_ord_dt >='2024-02-01' and sale_ord_dt <='2025-01-31' or parent_sale_ord_id='298899416362' and sale_ord_dt >='2024-02-01' and sale_ord_dt <='2025-01-31' or parent_sale_ord_id='295201527006' and sale_ord_dt >='2024-02-01' and sale_ord_dt <='2025-01-31' or parent_sale_ord_id='293998075702' ) and sale_ord_dt >='2024-02-01' and sale_ord_dt <='2025-01-31' and (( dt >='2024-02-01' and dt <='2025-04-01' ) or dt = '4712-12-31' ) offset 0 limit 10
+
+-- set enable_profile=true; set enable_sql_cache=false; set parallel_pipeline_task_num=1;SELECT
+--     *
+-- FROM
+--     app.app_jdr_survey_dmp_a_d_d
+-- WHERE
+--     dt = '2025-02-18'
+--   AND agg_type = '0'
+--   AND agg_days = '30'
+--   AND sex = '1'
+--   AND marriage = '1'
+--   AND ARRAY_CONTAINS(traffic_sku_set, '100034468527') = true
+--   AND ARRAY_CONTAINS(cart_sku_set, '100034468527') = true
+--   AND ARRAY_CONTAINS(ord_sku_set, '100034468527') = true limit 1000
+
+
+-- set enable_profile=true; set enable_sql_cache=false; set query_timeout=18000;set parallel_pipeline_task_num=0; select * from dmr_jud.dmrjud_jud_01_risk_ordr_i_d where ( parent_sale_ord_id='307227121162' and sale_ord_dt >='2024-06-01' and sale_ord_dt <='2025-01-31' or parent_sale_ord_id='306136265544' and sale_ord_dt >='2024-06-01' and sale_ord_dt <='2025-01-31' or parent_sale_ord_id='297180568074' and sale_ord_dt >='2024-06-01' and sale_ord_dt <='2025-01-31' or parent_sale_ord_id='289282900207' and sale_ord_dt >='2024-06-01' and sale_ord_dt <='2025-01-31' or parent_sale_ord_id='298899416362' and sale_ord_dt >='2024-06-01' and sale_ord_dt <='2025-01-31' or parent_sale_ord_id='295201527006' and sale_ord_dt >='2024-06-01' and sale_ord_dt <='2025-01-31' or parent_sale_ord_id='293998075702' ) and sale_ord_dt >='2024-06-01' and sale_ord_dt <='2025-01-31' and (( dt >='2024-06-01' and dt <='2025-01-01' ) or dt = '4712-12-31' ) offset 0 limit 10
+
+-- SELECT exp_info, shunt_info FROM app.app_touchstone_logbook_jrc_exp_log WHERE DAY = '2025-02-20' AND hour = '16' LIMIT 100;
+
+-- SELECT
+--     "dt"            "dt",
+--     "市名称"           "城市名称",
+--     SUM(a) / SUM(b) "门店现货率"
+-- FROM
+-- (
+--         SELECT
+--             app_jdh_yjt_sch_bi_i_sum_d.sku_id                           "商品id",
+--             app_jdh_yjt_sch_bi_i_sum_d.sku_name                         "商品名称",
+--             app_jdh_yjt_sch_bi_i_sum_d.common_name                      "通用名称",
+--             app_jdh_yjt_sch_bi_i_sum_d.prod_status_cd "线下商品经营状态         0停用1启用",
+--             app_jdh_yjt_sch_bi_i_sum_d.new_spec_flag                    "是否院内合作0否1是",
+--             app_jdh_yjt_sch_bi_i_sum_d.org_id                           "机构ID",
+--             app_jdh_yjt_sch_bi_i_sum_d.corp_id                          "总部id",
+--             app_jdh_yjt_sch_bi_i_sum_d.org_name                         "机构名称",
+--             app_jdh_yjt_sch_bi_i_sum_d.org_type_cd                      "机构类型代码",
+--             app_jdh_yjt_sch_bi_i_sum_d.purchase_man                     "采购员",
+--             app_jdh_yjt_sch_bi_i_sum_d.purchase_control_man             "采控员",
+--             CASE
+--             WHEN app_jdh_yjt_sch_bi_i_sum_d.new_org_flag = 0 THEN '老店'
+--             ELSE '新店'
+--             END AS "新仓标识（动销口径）",
+--             app_jdh_yjt_sch_bi_i_sum_d.sku_valid_flag "Sku有效标志",
+--             app_jdh_yjt_sch_bi_i_sum_d.sku_status_cd "Sku状态代码",
+--             app_jdh_yjt_sch_bi_i_sum_d.org_prod_status_cd "门店商品经营状态 0停用1启用",
+--             app_jdh_yjt_sch_bi_i_sum_d.bibei_flag "必备品标识",
+--             app_jdh_yjt_sch_bi_i_sum_d.changxiao_flag "畅销品标识",
+--             app_jdh_yjt_sch_bi_i_sum_d.stock_flag "有货标识",
+--             app_jdh_yjt_sch_bi_i_sum_d.supplement_stock_flag "补货仓有货标识",
+--             app_jdh_yjt_sch_bi_i_sum_d.supplement_sale_flag "补货仓动销标识",
+--             app_jdh_yjt_sch_bi_i_sum_d.outofstock_flag "缺货标识",
+--             app_jdh_yjt_sch_bi_i_sum_d.sale_day30_flag "30天动销标识",
+--             app_jdh_yjt_sch_bi_i_sum_d.shop_sale_day30_flag "店内30天动销标识",
+--             CAST(xianhuo_rate_fenzi AS FLOAT) a,
+--             CAST(xianhuo_rate_fenmu AS FLOAT) b,
+--             app_jdh_yjt_sch_bi_i_sum_d.bibei_xianhuo_rate_fenzi "必备品_现货率_分子",
+--             app_jdh_yjt_sch_bi_i_sum_d.bibei_xianhuo_rate_fenmu "必备品_现货率_分母",
+--             CAST(changxiao_xianhuo_rate_fenzi AS FLOAT) abc,
+--             CAST(changxiao_xianhuo_rate_fenmu AS FLOAT) abcfm,
+--             CAST(supplement_xianhuo_rate_fenzi AS FLOAT) dcxhlfz,
+--             CAST(supplement_xianhuo_rate_fenmu AS FLOAT) dcxhlfm,
+--             CAST(supplement_changxiao_xianhuo_rate_fenzi AS FLOAT) dcxhlfzABC,
+--             CAST(supplement_changxiao_xianhuo_rate_fenmu AS FLOAT) dcxhlfmABC,
+--             app_jdh_yjt_sch_bi_i_sum_d.dongxiao_rate_fenzi "动销率_分子",
+--             app_jdh_yjt_sch_bi_i_sum_d.dongxiao_rate_fenmu "动销率_分母",
+--             app_jdh_yjt_sch_bi_i_sum_d.bibei_dongxiao_rate_fenzi "必备品_动销率_分子",
+--             app_jdh_yjt_sch_bi_i_sum_d.bibei_dongxiao_rate_fenmu "必备品_动销率_分母",
+--             app_jdh_yjt_sch_bi_i_sum_d.dongxiao_xianhuo_rate_fenzi "动销品_现货率_分子",
+--             app_jdh_yjt_sch_bi_i_sum_d.dongxiao_xianhuo_rate_fenmu "动销品_现货率_分母",
+--             app_jdh_yjt_sch_bi_i_sum_d.shop_dongxiao_xianhuo_rate_fenzi "店内动销品_现货率_分子",
+--             app_jdh_yjt_sch_bi_i_sum_d.shop_dongxiao_xianhuo_rate_fenmu "店内动销品_现货率_分母",
+--             app_jdh_yjt_sch_bi_i_sum_d.oneplate_dongxiao_xianhuo_rate_fenzi "一盘货动销品_现货率_分子",
+--             app_jdh_yjt_sch_bi_i_sum_d.oneplate_dongxiao_xianhuo_rate_fenmu "一盘货动销品_现货率_分母",
+--             app_jdh_yjt_sch_bi_i_sum_d.o2o_dongxiao_xianhuo_rate_fenzi "O2O动销品_现货率_分子",
+--             app_jdh_yjt_sch_bi_i_sum_d.o2o_dongxiao_xianhuo_rate_fenmu "O2O动销品_现货率_分母",
+--             app_jdh_yjt_sch_bi_i_sum_d.presite_type "前置仓类型",
+--             app_jdh_yjt_sch_bi_i_sum_d.saas_test_flag "测试店标识",
+--             app_jdh_yjt_sch_bi_i_sum_d.city_id "市ID",
+--             app_jdh_yjt_sch_bi_i_sum_d.city_name "市名称",
+--             CAST(app_jdh_yjt_sch_bi_i_sum_d.dt AS DATE) dt
+--         FROM
+--             app.app_jdh_yjt_sch_bi_i_sum_d app_jdh_yjt_sch_bi_i_sum_d
+--         WHERE
+--             app_jdh_yjt_sch_bi_i_sum_d.dt >= '2025-01-12'
+--           AND app_jdh_yjt_sch_bi_i_sum_d.saas_test_flag = 0
+-- )ynpd
+-- WHERE
+--   (
+--     (("前置仓类型" = '医药'))
+--     AND (
+--       (
+--         "机构名称" NOT IN ('京东大药房（广东）有限公司', '京东富南大药房（广州）有限公司')
+--       )
+--       AND (
+--         "机构名称" NOT IN ('京东大药房（北京）有限公司西小马庄店', '京东大药房（万寿路）')
+--       )
+--       AND ("机构名称" NOT IN ('京东大药房（北京）有限公司紫竹桥店-万寿路自助售（取）'))
+--       AND ("机构名称" NOT IN ('京东大药房（广州）有限公司云景路分店'))
+--       AND (
+--         "机构名称" NOT IN ('北京京东佳创大药房有限公司', '北京京东科创大药房有限公司', '北京京东仁康大药房有限公司')
+--       )
+--     )
+--     AND (("新仓标识（动销口径）" = '老店'))
+--     AND (("市名称" = '广州市'))
+--   )
+-- GROUP BY
+--   "dt",
+--   "市名称"
+-- ORDER BY
+--   "dt" asc
+
+-- use dmc_bc; set erp='jingjianqiang1'; set hadoop_user_name='jingjianqiang1';select creator from dmc_jdt_dmcbc_event_order_main_jdcloud_i_det_d as d where creator in ('bjlijieyw');
+
+
+-- SELECT creator,
+--     SUM(case WHEN createtime > TIMESTAMP  '2025-01-01 00:00:00' THEN  1 ELSE 0 END ) AS year_sum,
+--     SUM(CASE WHEN responsetime IS NOT NULL AND createtime > TIMESTAMP '2025-01-01 00:00:00' AND date_diff('minute', parse_datetime(createtime, 'yyyy-MM-dd HH:mm:ss'), parse_datetime(responsetime, 'yyyy-MM-dd HH:mm:ss')) < 5 THEN 1 ELSE 0 END) AS year_response_lt_5,
+--     SUM(CASE WHEN solvetime IS NOT NULL AND createtime > TIMESTAMP '2025-01-01 00:00:00' AND date_diff('minute', parse_datetime(createtime, 'yyyy-MM-dd HH:mm:ss'), parse_datetime(solvetime, 'yyyy-MM-dd HH:mm:ss')) < 15 THEN 1 ELSE 0 END) AS year_solve_lt_15,
+--     SUM(CASE WHEN (solvetime IS NULL OR date_diff('minute', parse_datetime(createtime, 'yyyy-MM-dd HH:mm:ss'), parse_datetime(solvetime, 'yyyy-MM-dd HH:mm:ss')) > 15) AND createtime > TIMESTAMP '2025-01-01 00:00:00'  THEN 1 ELSE 0 END) AS year_solve_gt_15,
+--     SUM(CASE WHEN createtime > '2025-01-01 00:00:00' AND createtime < date_add(date_trunc('QUARTER', date_add('QUARTER', 1, current_date)), -1) THEN 1 ELSE 0 END) AS q_sum,
+--     SUM(CASE WHEN responsetime IS NOT NULL AND createtime > TIMESTAMP '2025-01-01 00:00:00' and createtime < date_add(date_trunc('QUARTER', date_add('QUARTER', 1, current_date)), -1)  AND date_diff('minute', parse_datetime(createtime, 'yyyy-MM-dd HH:mm:ss'), parse_datetime(responsetime, 'yyyy-MM-dd HH:mm:ss')) < 5 THEN 1 ELSE 0 END) AS q_response_lt_5,
+--     SUM(CASE WHEN solvetime IS NOT NULL AND createtime > TIMESTAMP '2025-01-01 00:00:00' and createtime < date_add(date_trunc('QUARTER', date_add('QUARTER', 1, current_date)), -1)  AND date_diff('minute', parse_datetime(createtime, 'yyyy-MM-dd HH:mm:ss'), parse_datetime(solvetime, 'yyyy-MM-dd HH:mm:ss')) < 15 THEN 1 ELSE 0 END) AS q_solve_lt_15,
+--     SUM(CASE WHEN (solvetime IS NULL OR date_diff('minute', parse_datetime(createtime, 'yyyy-MM-dd HH:mm:ss'), parse_datetime(solvetime, 'yyyy-MM-dd HH:mm:ss')) > 15) AND createtime > TIMESTAMP '2025-01-01 00:00:00' AND   createtime < date_add(date_trunc('QUARTER', date_add('QUARTER', 1, current_date)), -1)  THEN 1 ELSE 0 END) AS q_solve_gt_15,
+--     SUM(case WHEN createtime >= DATE_FORMAT(DATE_ADD('day', -((DAY_OF_WEEK(CURRENT_DATE) + 1) % 7), CURRENT_DATE), '%Y-%m-%d 00:00:00') AND createtime < DATE_FORMAT(DATE_ADD('day', 5 - DAY_OF_WEEK(CURRENT_DATE), CURRENT_DATE), '%Y-%m-%d 23:59:59') THEN 1 ELSE 0 END ) as week_sum,
+--     SUM(CASE WHEN responsetime IS NOT NULL AND createtime >= DATE_FORMAT(DATE_ADD('day', -((DAY_OF_WEEK(CURRENT_DATE) + 1) % 7), CURRENT_DATE), '%Y-%m-%d 00:00:00') AND createtime < DATE_FORMAT(DATE_ADD('day', 5 - DAY_OF_WEEK(CURRENT_DATE), CURRENT_DATE), '%Y-%m-%d 23:59:59')  AND date_diff('minute', parse_datetime(createtime, 'yyyy-MM-dd HH:mm:ss'), parse_datetime(responsetime, 'yyyy-MM-dd HH:mm:ss')) < 5 THEN 1 ELSE 0 END) AS week_response_lt_5,
+--     SUM(CASE WHEN solvetime IS NOT NULL AND createtime >= DATE_FORMAT(DATE_ADD('day', -((DAY_OF_WEEK(CURRENT_DATE) + 1) % 7), CURRENT_DATE), '%Y-%m-%d 00:00:00') AND createtime < DATE_FORMAT(DATE_ADD('day', 5 - DAY_OF_WEEK(CURRENT_DATE), CURRENT_DATE), '%Y-%m-%d 23:59:59')  AND date_diff('minute', parse_datetime(createtime, 'yyyy-MM-dd HH:mm:ss'), parse_datetime(solvetime, 'yyyy-MM-dd HH:mm:ss')) < 15 THEN 1 ELSE 0 END) AS week_solve_lt_15,
+--     SUM(CASE WHEN (solvetime IS NULL OR date_diff('minute', parse_datetime(createtime, 'yyyy-MM-dd HH:mm:ss'), parse_datetime(solvetime, 'yyyy-MM-dd HH:mm:ss')) > 15) AND createtime >= DATE_FORMAT(DATE_ADD('day', -((DAY_OF_WEEK(CURRENT_DATE) + 1) % 7), CURRENT_DATE), '%Y-%m-%d 00:00:00') AND createtime < DATE_FORMAT(DATE_ADD('day', 5 - DAY_OF_WEEK(CURRENT_DATE), CURRENT_DATE), '%Y-%m-%d 23:59:59')  THEN 1 ELSE 0 END) AS week_solve_gt_15 from dmc_jdt_dmcbc_event_order_main_jdcloud_i_det_d as d where creator in ('bjlijieyw','chenchengsong','chenzhihong37','duwenjuan6','gaowenping1','huangkaisheng5','jingjianqiang1','lina713','shenweisheng1','sunyuhao7','wangxin657','wangyanfei64','xiaodan17','yangbo501','yangxu167','zengweiyu1','zhangfeng297','zhanghuijing8','zhangshumei1','zhangyi808','xnwype')  GROUP  by creator
+--  limit 1000;
+
+-- select * from  app.app_ea_dim_vender_info_map_d where dt >= sysdate(-31) limit 1281;
+
+SELECT year_and_week(CAST(t."提测通过时间" AS varchar), '', 6, 4) AS "提测通过时间", COALESCE(TRY(CAST(avg(COALESCE(TRY(CAST(trim(CAST(CAST(trim(CAST(t."测试等待时间" AS varchar)) AS decimal (30, 10)) / CAST(trim(CAST(24 AS varchar)) AS decimal (30, 10)) AS varchar)) AS decimal (30, 10))), NULL)) AS decimal (30, 2))), NULL) AS "t1_测试等待时间（天）", COALESCE(TRY(CAST(avg(COALESCE(TRY(CAST(trim(CAST(CAST(trim(CAST(t."测试执行时间" AS varchar)) AS decimal (30, 10)) / CAST(trim(CAST(24 AS varchar)) AS decimal (30, 10)) AS varchar)) AS decimal (30, 10))), NULL)) AS decimal (30, 2))), NULL) AS "t1_测试执行时间（天）", COALESCE(TRY(CAST(avg(COALESCE(TRY(CAST(trim(CAST(CAST(trim(CAST(t."测试阻塞时间" AS varchar)) AS decimal (30, 10)) / CAST(trim(CAST(24 AS varchar)) AS decimal (30, 10)) AS varchar)) AS decimal (30, 10))), NULL)) AS decimal (30, 2))), NULL) AS "t1_测试阻塞时间（天）", COALESCE(TRY(count(DISTINCT (t."提测单id"))), NULL) AS "t1_提测单数量" FROM (SELECT dt AS "快照日期", proposer_erp AS "提测人erp", proposer_org_name AS "提测人部门", proposer_c1 AS "提测人部门C1", proposer_c2 AS "提测人部门C2", proposer_c3 AS "提测人部门C3", proposer_c4 AS "提测人部门C4", assignee_erp AS "测试受理人erp", assignee_org_name AS "测试受理人部门", assignee_c1 AS "测试受理部门C1", assignee_c2 AS "测试受理部门C2", assignee_c3 AS "测试受理部门C3", assignee_c4 AS "测试受理部门C4", submit_test_code AS "提测编码", submit_test_id AS "提测单id", submit_test_title AS "提测标题", card_name AS "卡片名称", state_name AS "状态名称", update_time AS "更新时间", create_time AS "提测时间", start_at AS "提测受理时间", IF(COALESCE(passed_at, '') = '', '1970-01-01', passed_at) AS "提测通过时间", space_name AS "团队空间", sprint_name AS "迭代名称", waiting_time AS "测试等待时间", blocked_time AS "测试阻塞时间", execution_time AS "测试执行时间", diff_day AS "测试等待时间（天）", CASE WHEN diff_day <= 7 THEN '<=7天' WHEN diff_day <= 14 AND diff_day > 7 THEN '7-14天' WHEN diff_day <= 30 AND diff_day > 14 THEN '14-30天' WHEN diff_day > 30 AND diff_day < 99999 THEN '>30天' ELSE 'unknown' END AS "测试等待时间范围" FROM (SELECT *, to_milliseconds((CAST(concat(dt, ' 23:59:59') AS TIMESTAMP) - CAST(create_time AS TIMESTAMP))) / 1000 / 60 / 60 / 24 AS diff_day FROM (SELECT dt, proposer_erp, proposer_org_name, SPLIT(proposer_org_name, '-')[3] AS proposer_c1, SPLIT(proposer_org_name, '-')[4] AS proposer_c2, SPLIT(proposer_org_name, '-')[5] AS proposer_c3, IF(LENGTH(proposer_org_name) - LENGTH(REPLACE(proposer_org_name, '-', '')) >= 5, SPLIT(proposer_org_name, '-')[6], NULL) AS proposer_c4, assignee_erp, assignee_org_name, IF(LENGTH(assignee_org_name) - LENGTH(REPLACE(assignee_org_name, '-', '')) >= 2, SPLIT(assignee_org_name, '-')[3], NULL) AS assignee_c1, IF(LENGTH(assignee_org_name) - LENGTH(REPLACE(assignee_org_name, '-', '')) >= 3, SPLIT(assignee_org_name, '-')[4], NULL) AS assignee_c2, IF(LENGTH(assignee_org_name) - LENGTH(REPLACE(assignee_org_name, '-', '')) >= 4, SPLIT(assignee_org_name, '-')[5], NULL) AS assignee_c3, IF(LENGTH(assignee_org_name) - LENGTH(REPLACE(assignee_org_name, '-', '')) >= 5, SPLIT(assignee_org_name, '-')[6], NULL) AS assignee_c4, submit_test_code, submit_test_id, submit_test_title, card_name, state_name, update_time, SUBSTR(create_time, 1, 19) create_time, start_at, SUBSTR(passed_at, 1, 19) AS passed_at, space_name, sprint_name, waiting_time, blocked_time, execution_time FROM app.app_defect_submit_test_mang_dtl_s_d_00008987 WHERE proposer_org_code LIKE '%/00000000/00008987/00046966/00103808%' AND dt >= sysdate(-100) AND v_deleted = '0') t) t) t WHERE (1 = 1 AND 1 = 1 AND (1 = 1 AND CAST(t."测试受理部门C3" AS varchar) IN ('成都研发部') AND (1 = 1 AND format_datetime(CAST(date_supplement(CAST(t."提测通过时间" AS varchar)) AS timestamp), 'yyyy-MM') >= '2024-11' AND format_datetime(CAST(date_supplement(CAST(t."提测通过时间" AS varchar)) AS timestamp), 'yyyy-MM') <= '2025-01')) AND (1 = 1 AND CAST(t."状态名称" AS varchar) IN ('通过') AND CAST(t."测试受理部门C2" AS varchar) IN ('金融科技研发部') AND (1 = 1 AND format_datetime(CAST(date_supplement(CAST(t."提测时间" AS varchar)) AS timestamp), 'yyyy-MM-dd') >= '2024-01-01' AND format_datetime(CAST(date_supplement(CAST(t."提测时间" AS varchar)) AS timestamp), 'yyyy-MM-dd') <= '2025-01-17') AND format_datetime(CAST(date_supplement(CAST(t."快照日期" AS varchar)) AS timestamp), 'yyyy-MM-dd') = '2025-01-17')) GROUP BY year_and_week(CAST(t."提测通过时间" AS varchar), '', 6, 4) ORDER BY "提测通过时间" limit 10000

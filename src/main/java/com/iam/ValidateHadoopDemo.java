@@ -1,6 +1,8 @@
 package com.iam;
 
 
+import com.rsa.conf.IamConfig;
+import config.ConfigLoader;
 import io.trino.jdbc.$internal.jackson.databind.JsonNode;
 import io.trino.jdbc.$internal.jackson.databind.ObjectMapper;
 import io.trino.jdbc.$internal.jackson.databind.node.ObjectNode;
@@ -17,11 +19,12 @@ import java.nio.charset.StandardCharsets;
 
 public class ValidateHadoopDemo {
 
-    private static String IAMEndpoint = "http://jsmapi.jd.com/api/account/identity/generateAppAccountTokenForPlatform";
-//    private static String IAMEndpoint = "http://jsmapi-sq.jd.com:8091/api/account/identity/generateAppAccountTokenForPlatform";
-    private static String DEFAULT_SOURCE = "easyolap";
-//    private static String IAMToken = "XWx1RYy+OE8Fn2B76VVhzA==";
-    private static String IAMToken = "XWx1RYy+OE8Fn2B76VVhzA==";
+    private static final ConfigLoader configLoader = ConfigLoader.getInstance();
+    private static final IamConfig iamConfig = configLoader.getIamConfig();
+
+    private static String IAMEndpoint = iamConfig.getIAMEndpoint();
+    private static String DEFAULT_SOURCE = iamConfig.getDefaultSource();
+    private static String IAMToken = iamConfig.getIAMToken();
     private static final CloseableHttpClient httpClient = HttpClients.createDefault();
     private static final ThreadLocal<ObjectMapper> threadLocalObjectMapper = ThreadLocal.withInitial(
             () -> new ObjectMapper());
@@ -72,9 +75,8 @@ public class ValidateHadoopDemo {
     }
 
     public static void main(String[] args) {
-        String erp = "caokaihua1";
-//        String hadoopUserName = "mart_dapc_test_prod";
-        String hadoopUserName = "recsys_10k_rank";
+        String erp = iamConfig.getErp();
+        String hadoopUserName = iamConfig.getHadoopUserName();
 
         System.out.println("The token for " + hadoopUserName +" is: " + getUserTokenFromIAMEndpoint(erp, hadoopUserName));
     }
