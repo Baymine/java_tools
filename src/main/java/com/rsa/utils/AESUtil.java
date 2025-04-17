@@ -26,7 +26,8 @@ public class AESUtil {
     private static final byte[] DIG_VEC_UPPER = {'0', '1', '2', '3', '4', '5', '6', '7',
             '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
     private static final ConfigLoader configLoader = ConfigLoader.getInstance();
-    public static final DatabaseConfig dbConfig = configLoader.getLakehouseDBConfig(JdbcDemo.sourceName);
+    public static DatabaseConfig dbConfig = configLoader.getLakehouseDBConfig(JdbcDemo.sourceName);
+//    public static DatabaseConfig dbConfig = configLoader.getLakehouseDBConfig("gateway");
 
     // 字节数为16位
     private static final byte[] KEY = dbConfig.getCipherKey().getBytes(StandardCharsets.UTF_8);
@@ -87,7 +88,7 @@ public class AESUtil {
 
     public static String getCipherText() throws Exception {
         TBDPUserInfo userInfo = new TBDPUserInfo();
-        userInfo.setErp("olap");
+        userInfo.setErp("easyolap");
         userInfo.setHadoopUserName(dbConfig.getHadoopUserName()); // 可选
         userInfo.setSource(JdbcDemo.sourceName); // 必填
         userInfo.setUserToken(dbConfig.getHadoopUserToken());
@@ -97,7 +98,8 @@ public class AESUtil {
 //        );
         userInfo.setScrambledPassword(makeScrambledPassword(dbConfig.getPassword())); //必填
         userInfo.setCatalog("hive"); // 可选 ,单独设置catalog
-        userInfo.setDb("app");
+//        userInfo.setDb("dms_dev");
+//        userInfo.setDb("dev");
 
         // 个人开发者账号
 //        userInfo.setUserType("dev_personal");
@@ -109,10 +111,31 @@ public class AESUtil {
     }
 
     public static void main(String[] args) throws Exception {
-        String cipherText = "gPjF4UEShOhIsPItcIIQE5cayh7cIQD+0L1xo3gRAlLNMsiiv/qoJBlSmsLsbY1buxVfSKpnb/ZdNdvYnVFbfHQlzfnW7fAYEbjwfLhpRacsNV2jRrXDWsDUSqzusXtZ";
+
+        String cipherText = "/TrKtpFw/CLcb6AuTa99Ybw6U3ZABQ28ebKNRiv3P4hKf3G43jXL7WU6oBObefywu6G1drU2BGqmk6J0s63oiRebKzeAmH0Y6e518FAa95GIBw2Pu0K2SRm4D4uVY5s7VSw08M25S6VbVW6ZZXU1ucrHiMG53IDgsvBFkWNMAoibiDJ8M0GjkzVtxLKJ/s5lisZXfoHLKejqfGMln6hlHRGiJbRSMNqJxyNj7uJln4W0=";
+        String cipherTextGenerated = getCipherText();
+        if (cipherTextGenerated.equals(cipherText)) {
+            System.out.println("the generated cipher is equivalent!");
+        } else {
+            System.out.println(cipherText);
+            System.out.println("vs");
+            System.out.println(cipherTextGenerated);
+        }
+        System.out.println("===== the cipher text =====");
         TBDPUserInfo decrypt = decrypt(cipherText);
+        System.out.println(decrypt.source);
+        System.out.println(decrypt.hadoopUserName);
+        System.out.println(decrypt.userToken);
+        System.out.println(decrypt.erp);
+        System.out.println(decrypt.catalog);
+        System.out.println(decrypt.db);
+        System.out.println(decrypt.scrambledPassword);
 
-
+        System.out.println("===== cipher text generated =====");
+        TBDPUserInfo decrypt1 = decrypt(cipherTextGenerated);
+        System.out.println("The source is: " + decrypt1.source);
+        System.out.println(decrypt1.hadoopUserName);
+        System.out.println(decrypt1.userToken);
     }
 }
 

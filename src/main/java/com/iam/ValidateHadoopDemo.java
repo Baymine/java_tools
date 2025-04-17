@@ -22,12 +22,12 @@ public class ValidateHadoopDemo {
     private static final ConfigLoader configLoader = ConfigLoader.getInstance();
     private static final IamConfig iamConfig = configLoader.getIamConfig();
 
-    private static String IAMEndpoint = iamConfig.getIAMEndpoint();
-    private static String DEFAULT_SOURCE = iamConfig.getDefaultSource();
-    private static String IAMToken = iamConfig.getIAMToken();
+    private static final String IAMEndpoint = iamConfig.getIAMEndpoint();
+    private static final String DEFAULT_SOURCE = iamConfig.getDefaultSource();
+    private static final String IAMToken = iamConfig.getIAMToken();
     private static final CloseableHttpClient httpClient = HttpClients.createDefault();
     private static final ThreadLocal<ObjectMapper> threadLocalObjectMapper = ThreadLocal.withInitial(
-            () -> new ObjectMapper());
+            ObjectMapper::new);
 
     public static ObjectMapper getObjectMapperInstance() {
         return threadLocalObjectMapper.get();
@@ -75,8 +75,8 @@ public class ValidateHadoopDemo {
     }
 
     public static void main(String[] args) {
-        String erp = iamConfig.getErp();
-        String hadoopUserName = iamConfig.getHadoopUserName();
+        String erp = "caokaihua1";
+        String hadoopUserName = "mart_jdcfc_stg";
 
         System.out.println("The token for " + hadoopUserName +" is: " + getUserTokenFromIAMEndpoint(erp, hadoopUserName));
     }

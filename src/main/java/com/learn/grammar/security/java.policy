@@ -1,0 +1,4 @@
+grant {
+    permission java.io.FilePermission "/tmp/admin_file.txt", "read";
+    permission java.io.FilePermission "/tmp/guest_file.txt", "read";
+};
