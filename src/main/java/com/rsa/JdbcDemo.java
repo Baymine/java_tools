@@ -10,11 +10,11 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.net.URLEncoder;
 import java.sql.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Properties;
-import java.util.Random;
 
 import static org.jd.stream.executor.SqlExecutor.*;
 
@@ -58,18 +58,17 @@ public class JdbcDemo {
 
             // 809: 11.62.28.0
             // 950:11.116.152.155
-            // 803: .6.162.35(debug), 6.6.145.3
             // 807: 11.102.220.241
-            List<String> feIpList = List.of("drpub1101.olap.jd.com","11.102.220.241");
+            List<String> feIpList = List.of("drpub1103.olap.jd.com","11.102.221.97", "11.154.208.50");
             int iterateTime = 1;
             int feIndex = 0;
             boolean isInteractive = false;
             boolean errorOnlyMode = false;  // in Interactive mode, if this is set to true, the output of sql will be ignored.
 
             String cipherText = "local".equals(sourceName) ? "" : AESUtil.getCipherText();
-//            cipherText = "gmJwtvYbyByTzNewcbVNIMTKVFYEQZ6hw977YcbiJl8cSbtyoutWrANW9tiIgGITqkEPmCXVc+hyfowuEB0L/P7TLB8GHzqv4+xh6x+MViSMQSfi4PrxhqbWPqdpxVCd5GLzxdX0BdEOgJmcVK0d6BPZQ0GilWofzqs+n98gUMVpY7FOs16GE1M6jFUsBVJK/Ng7HDUDs6wVbNau3dlajZC1J46jrk12zX2FvFXdLO1xpNifs/utq0RpztLZkjvKluUadJjteKR/bBoO/oDDfA==";
+//            cipherText = "4gNni3cdz7m7cNq6JdsqaYZHb735GC7icPiQj2CFhDBLRL8jV4hnRFnUC1DWRUVvJHwyBcIMOnXsKAnHqUy6XmLF9MJR9kLVpwe8S1sFoxrhSvkSyf8zisD/iVHv7GuGWMwdSWg4dNA+M6EAZR7kmZQKtJHLuV86kzu/JE1YtKexHF8Wsx7XrM7Ii5dTUfHk2zdm3ZxvC0jODspkfnpM5zZ43Kue8LUUE0s7st6keHIV30dWV9L4v2gsrzbSRIO5";
 //            cipherText = URLEncoder.encode(cipherText, "UTF-8");
-            System.out.println(cipherText);
+            System.out.println("===" + cipherText);
 
             String port = getPort(feIpList.get(feIndex));
 
@@ -91,7 +90,6 @@ public class JdbcDemo {
 
             try (Connection connection = DriverManager.getConnection(dbUrl, properties)){
                 logger.info("Database connection established");
-                System.out.println("****"+connection.getMetaData().getDriverVersion());
                 if (isInteractive) {
                     logger.debug("Starting interactive mode");
                     try {
@@ -103,11 +101,6 @@ public class JdbcDemo {
                 } else {
                     logger.debug("Starting non-interactive mode");
                     for (int i = 0; i < iterateTime; i++) {
-                        Random random = new Random();
-                        Integer randInt = random.nextInt();
-                        String sql1 = sql + "/* " + randInt.toString() + "*/";
-                        logger.info("Executing SQL: {}", sql1);
-
                         executeMultiSql(connection, sql, errorOnlyMode);
                         Thread.sleep(3000);
                     }
@@ -127,6 +120,10 @@ public class JdbcDemo {
         }
     }
 
+    /**
+     * 从指定文件路径读取 SQL 语句，并替换其中的 {TX_DATE} 占位符为昨天的日期。
+     * @return 替换后的 SQL 语句，若读取文件失败则返回空字符串。
+     */
     private static String getSQL() {
         StringBuilder sqlBuilder = new StringBuilder();
         try (BufferedReader reader = new BufferedReader(new FileReader(JdbcDemo.SQL_PATH))) {
@@ -137,13 +134,27 @@ public class JdbcDemo {
                     sqlBuilder.append(line).append(" ");
                 }
             }
-            return sqlBuilder.toString().trim();
+
+            String sql = sqlBuilder.toString().trim();
+
+            if (sql.contains("{TX_DATE}")) {
+                LocalDate yesterday = LocalDate.now().minusDays(1);
+                String yesterdayStr = yesterday.format(DateTimeFormatter.ISO_LOCAL_DATE);
+                sql = sql.replace("{TX_DATE}", yesterdayStr);
+            }
+
+            return sql;
         } catch (IOException e) {
             logger.error("Error reading SQL file: ", e);
             return ""; // Return empty string in case of error
         }
     }
 
+    /**
+     * 根据地址获取端口号
+     * @param address IP地址或域名
+     * @return 对应地址的端口号
+     */
     private static String getPort(String address) {
         return ServerPortConfig.getPort(address);
     }
