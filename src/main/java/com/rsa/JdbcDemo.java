@@ -63,8 +63,12 @@ public class JdbcDemo {
             // 809: 11.62.28.0
             // 950:11.116.152.155
             // 807: 11.102.220.241
-            List<String> feIpList = List.of("drpub805.olap.jd.com","11.102.221.37", "11.154.208.50","gateway15-doris.orca.jd.local");
-            int iterateTime = 3;
+//            List<String> feIpList = List.of("drpub805.olap.jd.com","11.102.221.37", "11.154.208.50","gateway15-doris.orca.jd.local");
+//            List<String> feIpList = List.of("drpub807.olap.jd.com",
+//                    "drpub808.olap.jd.com", "drpub809.olap.jd.com",
+//                    "drpub810.olap.jd.com","drpub820.olap.jd.com");
+            List<String> feIpList = List.of("6.5.39.241");
+            int iterateTime = 1;
             int feIndex = 0;
 
             boolean isInteractive = false;
@@ -75,14 +79,9 @@ public class JdbcDemo {
 //            cipherText = URLEncoder.encode(cipherText, "UTF-8");
             System.out.println("===" + cipherText);
 
-            String port = getPort(feIpList.get(feIndex));
-
-            logger.debug("Port set to: {}", port);
-
             // Read SQL from file and skip commented lines
             String sql = getSQL();
             logger.debug("SQL loaded from file");
-
             String userName = dbConfig.getUsername();
             String source = sourceName;
             String password = dbConfig.getPassword();
@@ -90,37 +89,42 @@ public class JdbcDemo {
             Properties properties = new Properties();
             properties.put("user", "local".equals(source) ? userName : userName + "$" + source);
             properties.put("password", password);
-            String dbUrl = String.format(DB_URL_TEMPLATE, feIpList.get(feIndex), port, cipherText);
-            logger.info("Connecting to database: {}", dbUrl);
+//            logger.info("Connecting to database: {}", dbUrl);
 
-            try (Connection connection = DriverManager.getConnection(dbUrl, properties)){
-                logger.info("Database connection established");
-                if (isInteractive) {
-                    logger.debug("Starting interactive mode");
-                    try {
-                        interactive(connection);
-                        logger.debug("Interactive mode completed");
-                    } catch (Exception e) {
-                        logger.error("Error in interactive mode: ", e);
+            for (int ip_idx = 0; ip_idx < feIpList.size(); ip_idx++) {
+                String current_ip_domain = feIpList.get(ip_idx);
+                String port = getPort(current_ip_domain);
+                String dbUrl = String.format(DB_URL_TEMPLATE, current_ip_domain, port, cipherText);
+
+                try (Connection connection = DriverManager.getConnection(dbUrl, properties)){
+                    logger.info("Database connection established: " + current_ip_domain);
+                    if (isInteractive) {
+                        logger.debug("Starting interactive mode");
+                        try {
+                            interactive(connection);
+                            logger.debug("Interactive mode completed");
+                        } catch (Exception e) {
+                            logger.error("Error in interactive mode: ", e);
+                        }
+                    } else {
+                        logger.debug("Starting non-interactive mode");
+                        for (int i = 0; i < iterateTime; i++) {
+                            executeMultiSql(connection, sql, errorOnlyMode, rowCountMap);
+                            Thread.sleep(3);
+                        }
+                        if (errorOnlyMode) {
+                            logger.debug("Start print rowCountMap");
+                            rowCountMap.forEach((rowCount, occurrences) -> {
+                                System.out.println("RowCount: " + rowCount + " Occurrences: " + occurrences);
+                            });
+                        }
+                        logger.debug("Non-interactive mode completed");
                     }
-                } else {
-                    logger.debug("Starting non-interactive mode");
-                    for (int i = 0; i < iterateTime; i++) {
-                        executeMultiSql(connection, sql, errorOnlyMode, rowCountMap);
-                        Thread.sleep(3);
-                    }
-                    if (errorOnlyMode) {
-                        logger.debug("Start print rowCountMap");
-                        rowCountMap.forEach((rowCount, occurrences) -> {
-                            System.out.println("RowCount: " + rowCount + " Occurrences: " + occurrences);
-                        });
-                    }
-                    logger.debug("Non-interactive mode completed");
+                } catch (SQLException e) {
+                    logger.error("SQL Error: ", e);
+                } catch (InterruptedException e) {
+                    logger.error("Thread interrupted: ", e);
                 }
-            } catch (SQLException e) {
-                logger.error("SQL Error: ", e);
-            } catch (InterruptedException e) {
-                logger.error("Thread interrupted: ", e);
             }
 
             logger.debug("JdbcDemo application finished");

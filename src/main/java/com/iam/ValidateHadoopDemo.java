@@ -76,7 +76,7 @@ public class ValidateHadoopDemo {
 
     public static void main(String[] args) {
         String erp = "caokaihua1";
-        String hadoopUserName = "mart_cmo_ownbrd_sub";
+        String hadoopUserName = "mart_ads_dmp_l3";
 
         System.out.println("The token for " + hadoopUserName +" is: " + getUserTokenFromIAMEndpoint(erp, hadoopUserName));
     }
