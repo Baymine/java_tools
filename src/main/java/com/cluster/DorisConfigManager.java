@@ -507,8 +507,8 @@ public class DorisConfigManager {
             }
 
             // Use default hosts if not provided via env vars (provide clear defaults)
-             String defaultRefHost = "drts802"; // EXAMPLE:drts802
-             String defaultTargetHosts = "drpub821"; // EXAMPLE:"drpub821, drpub1102"
+             String defaultRefHost = "drpub153"; // EXAMPLE:drts802
+             String defaultTargetHosts = "drpub126"; // EXAMPLE:"drpub821, drpub1102"
             if (refClusterHost == null || refClusterHost.isBlank()) {
                  LOGGER.warn("REF_CLUSTER_HOST not set, using default: {}", defaultRefHost);
                  refClusterHost = defaultRefHost;

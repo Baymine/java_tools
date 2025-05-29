@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
@@ -30,7 +31,7 @@ public class SqlExecutor {
      * @param errorOnlyMode A boolean flag indicating the mode of operation:
      *                      {@code false}: Normal mode, {@code true}: Error-only mode.
      */
-    public static void executeMultiSql(Connection connection, String sql, boolean errorOnlyMode) {
+    public static void executeMultiSql(Connection connection, String sql, boolean errorOnlyMode, Map<Integer, Integer> rowCountMap) {
         logger.debug("Executing SQL in {} mode", errorOnlyMode ? "error-only" : "normal");
         long startTime = System.currentTimeMillis();
 
@@ -50,6 +51,7 @@ public class SqlExecutor {
                                 rowCount++;
                             }
                             System.out.println("Number of rows: " + rowCount);
+                            rowCountMap.put(rowCount, rowCountMap.getOrDefault(rowCount, 0) + 1);
                         } else {
                             displayResultSet(resultSet);
                         }

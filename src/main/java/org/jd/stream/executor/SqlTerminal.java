@@ -282,7 +282,7 @@ public class SqlTerminal {
                 System.setErr(ps);
                 
                 // Execute the SQL command
-                SqlExecutor.executeMultiSql(connection, sql, false);
+                SqlExecutor.executeMultiSql(connection, sql, false, null);
                 
                 // Get the output
                 ps.flush();

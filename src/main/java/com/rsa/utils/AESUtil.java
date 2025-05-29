@@ -27,7 +27,7 @@ public class AESUtil {
             '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
     private static final ConfigLoader configLoader = ConfigLoader.getInstance();
     public static DatabaseConfig dbConfig = configLoader.getLakehouseDBConfig(JdbcDemo.sourceName);
-//    public static DatabaseConfig dbConfig = configLoader.getLakehouseDBConfig("gateway");
+//    public static DatabaseConfig dbConfig = configLoader.getLakehouseDBConfig("easybi");
 
     // 字节数为16位
     private static final byte[] KEY = dbConfig.getCipherKey().getBytes(StandardCharsets.UTF_8);
@@ -112,7 +112,8 @@ public class AESUtil {
 
     public static void main(String[] args) throws Exception {
 
-        String cipherText = "/TrKtpFw/CLcb6AuTa99Ybw6U3ZABQ28ebKNRiv3P4hKf3G43jXL7WU6oBObefywu6G1drU2BGqmk6J0s63oiRebKzeAmH0Y6e518FAa95GIBw2Pu0K2SRm4D4uVY5s7VSw08M25S6VbVW6ZZXU1ucrHiMG53IDgsvBFkWNMAoibiDJ8M0GjkzVtxLKJ/s5lisZXfoHLKejqfGMln6hlHRGiJbRSMNqJxyNj7uJln4W0=";
+        String cipherText = "MT2+DgEyejqSuabtSrGKlWhDEB4Zrj9GceAQ3ZRYtAgrPQWh8S7AmEt2tlLnvLHj6GlhNPWUqT2RZTe3CWJuAi/KouB1M6nH2UTXLrgNXfO7LNJqVyoC2CAlZoY7lbW43pjTChi9IMnDR0b2wBbV0esRmVI13ReOpEklK14nHatitVX6iVfrpOgy/4mKV4J3jHZLUvpuSuxPcPpd/az+opbfFc2H2ktp9L0Lc4jO7uc=";
+//        String cipherText = "SV3VWoGoH6Y+RxdV9TmxO9TudXb7431tj5ho6oFGA2uuIUzP5YvJWTkUI6xBy9VEDHTVCGo6PRSLcJ4FV1yLcg==";
         String cipherTextGenerated = getCipherText();
         if (cipherTextGenerated.equals(cipherText)) {
             System.out.println("the generated cipher is equivalent!");

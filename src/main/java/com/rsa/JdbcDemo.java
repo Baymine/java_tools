@@ -13,7 +13,9 @@ import java.io.IOException;
 import java.sql.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import static org.jd.stream.executor.SqlExecutor.*;
@@ -35,6 +37,8 @@ public class JdbcDemo {
 
     // Database credentials
     public static String sourceName = "";
+
+    static Map<Integer, Integer> rowCountMap = new HashMap<>();
 
     /**
      * 主函数，用于连接到指定的数据库并执行SQL语句。
@@ -59,11 +63,12 @@ public class JdbcDemo {
             // 809: 11.62.28.0
             // 950:11.116.152.155
             // 807: 11.102.220.241
-            List<String> feIpList = List.of("drpub1103.olap.jd.com","11.102.221.97", "11.154.208.50");
-            int iterateTime = 1;
+            List<String> feIpList = List.of("drpub805.olap.jd.com","11.102.221.37", "11.154.208.50","gateway15-doris.orca.jd.local");
+            int iterateTime = 3;
             int feIndex = 0;
+
             boolean isInteractive = false;
-            boolean errorOnlyMode = false;  // in Interactive mode, if this is set to true, the output of sql will be ignored.
+            boolean errorOnlyMode = true;  // in Interactive mode, if this is set to true, the output of sql will be ignored.
 
             String cipherText = "local".equals(sourceName) ? "" : AESUtil.getCipherText();
 //            cipherText = "4gNni3cdz7m7cNq6JdsqaYZHb735GC7icPiQj2CFhDBLRL8jV4hnRFnUC1DWRUVvJHwyBcIMOnXsKAnHqUy6XmLF9MJR9kLVpwe8S1sFoxrhSvkSyf8zisD/iVHv7GuGWMwdSWg4dNA+M6EAZR7kmZQKtJHLuV86kzu/JE1YtKexHF8Wsx7XrM7Ii5dTUfHk2zdm3ZxvC0jODspkfnpM5zZ43Kue8LUUE0s7st6keHIV30dWV9L4v2gsrzbSRIO5";
@@ -101,8 +106,14 @@ public class JdbcDemo {
                 } else {
                     logger.debug("Starting non-interactive mode");
                     for (int i = 0; i < iterateTime; i++) {
-                        executeMultiSql(connection, sql, errorOnlyMode);
-                        Thread.sleep(3000);
+                        executeMultiSql(connection, sql, errorOnlyMode, rowCountMap);
+                        Thread.sleep(3);
+                    }
+                    if (errorOnlyMode) {
+                        logger.debug("Start print rowCountMap");
+                        rowCountMap.forEach((rowCount, occurrences) -> {
+                            System.out.println("RowCount: " + rowCount + " Occurrences: " + occurrences);
+                        });
                     }
                     logger.debug("Non-interactive mode completed");
                 }
